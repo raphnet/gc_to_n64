@@ -1,0 +1,24 @@
+
+
+
+
+
+Mario Kart 64
+
+N64 Controller functions during race
+
+
+Joystick  -> Direciton
+A -> Gas
+B -> Brake
+L/R -> Jump/slide
+Z -> Use item
+C-right : Toggle display
+C-up : Toggle camera
+
+
+Gamecube mapping is straightforward
+
+
+
+
