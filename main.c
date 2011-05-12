@@ -82,12 +82,15 @@ void saveCurrentMappingTo(int id)
 
 void loadMappingId(int id)
 {
+
+	// Always start from default mapping
+	memcpy(current_mapping, gamecube_to_n64_default_mapping, sizeof(current_mapping));
+
 	switch(id)
 	{
 		default:
-		case 0: 	
-			// Load default mapping
-			memcpy(current_mapping, gamecube_to_n64_default_mapping, sizeof(current_mapping));
+		case 0:
+			// default mapping used.
 			break;
 		
 		case 1:
