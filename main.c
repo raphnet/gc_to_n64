@@ -118,6 +118,22 @@ void loadMappingId(int id)
 
 static void gc_report_to_mapping(const unsigned char gcr[GC_REPORT_SIZE], struct mapping_controller_unit *gcs);
 
+static void waitStartRelease(void)
+{
+	while(1)
+	{
+
+		gcpad->update();
+		gcpad->buildReport(gc_report);
+		gc_report_to_mapping(gc_report, g_gamecube_status);
+
+		if (!g_gamecube_status[MAP_GC_BTN_START].value)
+			break;
+
+		_delay_ms(16);
+	}
+}
+
 static int getEvent(void)
 {
 	static int status = 0;
@@ -302,6 +318,8 @@ void menumain()
 	cli();
 
 	blips(5);
+
+	waitStartRelease();
 
 	while(1)
 	{
@@ -527,7 +545,6 @@ int main(void)
 	n64_tx_id2_reply[1] = 0x00; 
 	n64_tx_id2_reply[2] = 0x00;
 	
-	sei();
 
 	eeprom_init();
 
@@ -538,6 +555,20 @@ int main(void)
 	timerStart();
 
 	gcpad->init();
+
+	_delay_ms(500);
+
+	/* Read from Gamecube controller */
+	gcpad->update();
+	gcpad->buildReport(gc_report);
+	gc_report_to_mapping(gc_report, g_gamecube_status);
+
+	if (g_gamecube_status[MAP_GC_BTN_START].value) {
+		menumain(g_gamecube_status);
+	}
+
+	sei();
+
 	while(1)
 	{
 		if (n64_got_command) {
