@@ -34,10 +34,10 @@ struct mapping_controller_unit g_n64_status[] = {
 	[MAP_N64_BTN_DPAD_RIGHT] = { .type = TYPE_BTN, }, // Dpad-right
 	[MAP_N64_AXIS_LEFT_RIGHT] = { .type = TYPE_AXIS }, // Left-right axis
 	[MAP_N64_AXIS_UP_DOWN]	= { .type = TYPE_AXIS }, // Up-down axis
-	[MAP_N64_AXB_JOY_UP]	= { .type = TYPE_AXIS_TO_BTN, .thres = THRES_FULL_POS }, // Joystick up
-	[MAP_N64_AXB_JOY_DOWN]	= { .type = TYPE_AXIS_TO_BTN, .thres = THRES_FULL_NEG }, // Joystick down
-	[MAP_N64_AXB_JOY_LEFT]	= { .type = TYPE_AXIS_TO_BTN, .thres = THRES_FULL_POS }, // Joystick left
-	[MAP_N64_AXB_JOY_RIGHT]	= { .type = TYPE_AXIS_TO_BTN, .thres = THRES_FULL_NEG }, // Joystick right
+	[MAP_N64_AXB_JOY_UP]	= { .type = TYPE_AXIS_TO_BTN, .thres = THRES_FULL_NEG }, // Joystick up
+	[MAP_N64_AXB_JOY_DOWN]	= { .type = TYPE_AXIS_TO_BTN, .thres = THRES_FULL_POS }, // Joystick down
+	[MAP_N64_AXB_JOY_LEFT]	= { .type = TYPE_AXIS_TO_BTN, .thres = THRES_FULL_NEG }, // Joystick left
+	[MAP_N64_AXB_JOY_RIGHT]	= { .type = TYPE_AXIS_TO_BTN, .thres = THRES_FULL_POS }, // Joystick right
 	[MAP_N64_NONE] = { .type = TYPE_NONE },
 };
 
