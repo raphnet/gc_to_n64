@@ -528,24 +528,6 @@ int main(void)
 	n64_tx_id2_reply[2] = 0x00;
 	
 	sei();
-#if 0
-	while(1)
-	{
-		if (int_r8_got_command) {			
-			int_r8_got_command = 0;
-//			PORTD ^= 1;
-			// detects reads from N64. Useful to sync reads
-			// from slave controller (GC, SNES, etc)
-			int_r2_use_buf1 = !int_r2_use_buf1;
-		}
-
-		if (int_r2_use_buf1) {
-			n64_tx_buf0[3] = !(PINC & 0x20);			
-		} else {
-			n64_tx_buf1[3] = !(PINC & 0x20);
-		}
-	}
-#endif
 
 	eeprom_init();
 
@@ -587,7 +569,6 @@ int main(void)
 				// to the console in interrupt context.
 				n64_status_to_output(g_n64_status, n64_use_buf1 ? n64_tx_buf0 : n64_tx_buf1);
 
-//				convertGCtoN64(n64_use_buf1 ? n64_tx_buf0 : n64_tx_buf1);
 				n64_use_buf1 = !n64_use_buf1;
 			}
 		}
