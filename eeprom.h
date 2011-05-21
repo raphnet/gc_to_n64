@@ -2,7 +2,11 @@
 #define _eeprom_h__
 
 #define EEPROM_MAGIC_SIZE		7
-#define EEPROM_APPDATA_SIZE		512
+#define EEPROM_APPDATA_SIZE		256
+
+// Atmega8 : 512 byte eeprom
+//
+// 28 bytes per mapping
 
 struct eeprom_data_struct {
 	unsigned char magic[EEPROM_MAGIC_SIZE]; /* 'TenkiCfg' */
