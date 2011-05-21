@@ -80,8 +80,9 @@ void saveCurrentMappingTo(int id)
 	}
 }
 
-void loadMappingId(int id)
+int loadMappingId(int id)
 {
+	unsigned char *mapping_pointer;
 
 	// Always start from default mapping
 	memcpy(current_mapping, gamecube_to_n64_default_mapping, sizeof(current_mapping));
@@ -97,8 +98,14 @@ void loadMappingId(int id)
 		case 2:
 		case 3:
 		case 4:
-			memcpy(current_mapping, g_eeprom_data.appdata + (sizeof(current_mapping) * (id-1)), sizeof(current_mapping));
+			mapping_pointer = g_eeprom_data.appdata + (sizeof(current_mapping) * (id-1));
+			if (mapping_pointer[0] == 0xff) {
+				// Terminator at the beginning? Empty slot!
+				return -1;
+			}
+			memcpy(current_mapping, mapping_pointer, sizeof(current_mapping));
 	}
+	return 0;
 }
 
 
@@ -108,11 +115,12 @@ void loadMappingId(int id)
 #define EV_BTN_Y		0x008
 #define EV_BTN_Z		0x010
 #define EV_BTN_L		0x020
-#define EV_BTN_D_UP		0x040
-#define EV_BTN_D_DOWN	0x080	
-#define EV_BTN_D_LEFT	0x100
-#define EV_BTN_D_RIGHT	0x200
-#define EV_BTN_START	0x400
+#define EV_BTN_R		0x040
+#define EV_BTN_D_UP		0x080
+#define EV_BTN_D_DOWN	0x100	
+#define EV_BTN_D_LEFT	0x200
+#define EV_BTN_D_RIGHT	0x400
+#define EV_BTN_START	0x800
 
 #define CODE_BASE	4
 
@@ -163,6 +171,8 @@ static int getEvent(void)
 				now |= EV_BTN_Z;	
 			if (g_gamecube_status[MAP_GC_BTN_L].value)
 				now |= EV_BTN_L;	
+			if (g_gamecube_status[MAP_GC_BTN_R].value)
+				now |= EV_BTN_R;	
 			if (g_gamecube_status[MAP_GC_BTN_DPAD_UP].value)
 				now |= EV_BTN_D_UP;	
 			if (g_gamecube_status[MAP_GC_BTN_DPAD_DOWN].value)
@@ -269,14 +279,15 @@ first_ev:
 	return 0;
 }
 
-// Z pressed. Next steps:
+// R pressed. Next steps:
 //
 // Dpad direction : Save to corresponding slots and exit.
 // Start : Load default mapping and exit.
-int zmenu_do()
+int rmenu_do()
 {
 	int ev;
 
+	blips(1);
 	ev = getEvent();
 
 	switch(ev)
@@ -329,32 +340,44 @@ void menumain()
 		switch(ev)
 		{
 			case EV_BTN_D_UP:
-				loadMappingId(1);
-				goto menu_done;
-
-			case EV_BTN_D_DOWN:
-				loadMappingId(2);
-				goto menu_done;
-
-			case EV_BTN_D_LEFT:
-				loadMappingId(3);
-				// load stored config id X
-				goto menu_done;
-
-			case EV_BTN_D_RIGHT:
-				loadMappingId(4);
-				goto menu_done;
-
-			case EV_BTN_START:
-				goto menu_done;
-
-			case EV_BTN_Z:
-				res = zmenu_do();
+				res = loadMappingId(1);
 				if (res==-1)
 					goto error;
 
 				goto menu_done;
 
+			case EV_BTN_D_DOWN:
+				res = loadMappingId(2);
+				if (res==-1)
+					goto error;
+
+				goto menu_done;
+
+			case EV_BTN_D_LEFT:
+				res = loadMappingId(3);
+				if (res==-1)
+					goto error;
+
+				goto menu_done;
+
+			case EV_BTN_D_RIGHT:
+				res = loadMappingId(4);
+				if (res==-1)
+					goto error;
+
+				goto menu_done;
+
+			case EV_BTN_START:
+				goto menu_done;
+
+			case EV_BTN_R:
+				res = rmenu_do();
+				if (res==-1)
+					goto error;
+
+				goto menu_done;
+
+			case EV_BTN_Z:
 			case EV_BTN_A:
 			case EV_BTN_B:
 			case EV_BTN_X:
@@ -545,6 +568,7 @@ int main(void)
 	n64_tx_id2_reply[1] = 0x00; 
 	n64_tx_id2_reply[2] = 0x00;
 	
+	sei();
 
 	eeprom_init();
 
@@ -567,7 +591,6 @@ int main(void)
 		menumain(g_gamecube_status);
 	}
 
-	sei();
 
 	while(1)
 	{
