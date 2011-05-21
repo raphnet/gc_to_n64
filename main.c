@@ -601,6 +601,7 @@ int main(void)
 			timerIntOff();		
 			gcpad->update();
 			timerIntOn();
+
 			if (gcpad->changed()) {
 				// Read the gamepad	
 				gcpad->buildReport(gc_report);				
@@ -611,10 +612,7 @@ int main(void)
 
 				// Maybe enter configuration menu mode. If we did,
 				// 1 is returned.
-				if (domenu(g_gamecube_status)) {
-					continue;
-				}
-				
+							
 				// Perform mapping (conversion), copying data at appropriate
 				// places in the output structure (n64 status)
 				mapper_copy(current_mapping, g_gamecube_status, g_n64_status);
@@ -625,6 +623,9 @@ int main(void)
 
 				n64_use_buf1 = !n64_use_buf1;
 			}
+
+			domenu(g_gamecube_status);
+	
 		}
 
 	}
