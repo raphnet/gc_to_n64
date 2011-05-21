@@ -21,7 +21,8 @@ static unsigned char t0_count;
 
 ISR(TIMER0_OVF_vect)
 {
-	t0_count++;
+	if (t0_count<60)
+		t0_count++;
 }
 
 void timerIntOff()
