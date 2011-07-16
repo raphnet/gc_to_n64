@@ -11,7 +11,7 @@ AVRDUDE=avrdude
 AVRDUDE_CPU=m8
 #AVRDUDE_CPU=m88
 
-OBJS=main.o gamecube.o support.o n64_isr.o mapper.o gamecube_mapping.o n64_mapping.o buzzer.o timer0.o eeprom.o
+OBJS=main.o gamecube.o support.o n64_isr.o mapper.o gamecube_mapping.o n64_mapping.o buzzer.o timer0.o eeprom.o sync.o
 
 all: $(HEXFILE)
 
