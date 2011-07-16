@@ -74,7 +74,7 @@
 
 #define DEBUG_PORTD_BIT 0x00	/* In PORTD */
 
-#if 1
+#if 0
 #define DEBUG_ON 	sbi IO_PORTD, DEBUG_PORTD_BIT	; DEBUG
 #define DEBUG_OFF 	cbi IO_PORTD, DEBUG_PORTD_BIT	; DEBUG
 #else
@@ -108,6 +108,7 @@ SIG_INTERRUPT0:
 	push r20
 	push r16
 	push r17
+	push r23
 	ldi	zl, lo8(n64_rx_buf)
 	ldi zh, hi8(n64_rx_buf)
 	ldi r16, N64_RX_BUF_SIZE				; We can accept up to 32 bits
@@ -192,6 +193,7 @@ rx_complete_h:
 	; fallthrough to interrupt done.
 	
 interrupt_done_poll:
+	pop r23
 	pop r17
 	pop r16	
 	pop r20
@@ -203,14 +205,19 @@ interrupt_done_poll:
 
 
 got_8bit_command:
-	; repoint Z to origin of reception buffer	
-	ldi	zl, lo8(n64_rx_buf)
-	ldi zh, hi8(n64_rx_buf)
 
 	; Commands:
 	; 0x00 : Get capability
 	; 0x01 : Get button status
+	
+	ldi r20, 1
+	ldi	zl, lo8(n64_got_command)
+	ldi zh, hi8(n64_got_command)
+	st z, r20
 
+	; repoint Z to origin of reception buffer	
+	ldi	zl, lo8(n64_rx_buf)
+	ldi zh, hi8(n64_rx_buf)
 	; Convert from 8 bytes to one byte, reult in r20
 	rcall rx_buf_to_byte
 
@@ -240,11 +247,7 @@ cap:
 	
 		
 stat:
-	ldi r20, 1
-	ldi	zl, lo8(n64_got_command)
-	ldi zh, hi8(n64_got_command)
-	st z, r20
-	rcall sendStatus
+		rcall sendStatus
 	rjmp interrupt_done_poll
 
 	/*********************** DELAY *************/
