@@ -16,6 +16,7 @@
 */
 #include <stdio.h>
 #include <avr/io.h>
+#include <util/delay.h>
 
 #include "support.h"
 #include "boarddef.h"
@@ -135,7 +136,7 @@ int _n64Update(unsigned char tmp)
 			// We are now more or less aligned on the 24th cycle.			
 "			in r18, %4\n			" // 1  Read from the port
 "			sbi %5, 1\n"				// DEBUG
-"			andi r18, 0x20\n		" // 1  Isolate our bit
+"			andi r18, 0x08\n		" // 1  Isolate our bit
 "			st z+, r18\n			" // 2  store the value
 
 "			dec r19\n				" // 1 decrement the bit counter
@@ -146,7 +147,7 @@ int _n64Update(unsigned char tmp)
 "			dec r16\n				" // decrement timeout
 "			breq timeout\n			" // handle timeout condition
 "			in r18, %4\n			" // Read the port
-"			andi r18, 0x20\n		" // Isolate our bit
+"			andi r18, 0x08\n		" // Isolate our bit
 "			brne st\n				" // Continue if set
 "			rjmp waitHigh\n			" // loop otherwise..
 
@@ -178,73 +179,6 @@ int _n64Update(unsigned char tmp)
 		return -1; // failure
 	}
 	
-	
-/*
-	Bit	Function
-	0	A
-	1	B
-	2	Z
-	3	Start
-	4	Directional Up
-	5	Directional Down
-	6	Directional Left
-	7	Directional Right
-	8	unknown (always 0)
-	9	unknown (always 0)
-	10	L
-	11	R
-	12	C Up
-	13	C Down
-	14	C Left
-	15	C Right
-	16-23: analog X axis
-	24-31: analog Y axis
- */
-
-	tmpdata[0]=0;
-	tmpdata[1]=0;
-	tmpdata[2]=0;
-	tmpdata[3]=0;
-
-	for (i=0; i<4; i++) // A B Z START
-		tmpdata[2] |= results[i] ? (0x01<<i) : 0;
-
-	for (i=0; i<4; i++) // C-UP C-DOWN C-LEFT C-RIGHT
-		tmpdata[2] |= results[i+12] ? (0x10<<i) : 0;
-	
-	for (i=0; i<2; i++) // L R
-		tmpdata[3] |= results[i+10] ? (0x01<<i) : 0;
-
-	for (i=0; i<8; i++) // X axis
-		tmpdata[0] |= results[i+16] ? (0x80>>i) : 0;
-	
-	for (i=0; i<8; i++) // Y axis
-		tmpdata[1] |= results[i+24] ? (0x80>>i) : 0;	
-
-#if 0
-	// analog joystick
-	last_built_report[0] = ((int)((signed char)tmpdata[0]))+127;
-	last_built_report[1] = ((int)( -((signed char)tmpdata[1])) )+127;
-
-	last_built_report[2] = 0x7f;
-	last_built_report[3] = 0x7f;
-	last_built_report[4] = 0x7f;
-	last_built_report[5] = 0x7f;
-
-	// buttons
-	last_built_report[6] = tmpdata[2];
-	last_built_report[7] = tmpdata[3];
-
-	// dpad as buttons
-	if (results[4]) 
-		last_built_report[7] |= 0x04;
-	if (results[5])
-		last_built_report[7] |= 0x08;
-	if (results[6])
-		last_built_report[7] |= 0x10;
-	if (results[7])
-		last_built_report[7] |= 0x20;
-#endif
 	return 0;
 }
 
