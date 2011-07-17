@@ -16,8 +16,10 @@
 */
 #include <avr/io.h>
 
-#define OLD_MODE
-
+/* Forces the old behaviour which means a stable time distance 
+ * between N64 poll and our Gamecube * poll. Sometimes useful
+ * when debugging with an oscilloscope. */
+//#define OLD_MODE
 
 /* 
  * - Introduction
@@ -47,8 +49,16 @@
  *
  *
  * - Strategy
+ * 
+ * Instead of polling right away after being polled by the N64,
+ * we wait and poll at the last minute before the N64 polls us.
+ * This way, we are able to reply with a controller status as fresh
+ * as possible.
  *
- *
+ * The time we wait is based on the duration between polls and
+ * is updated after each poll, unless the previous poll is too
+ * close in time. This is meant to prevent problems with games which
+ * quick series of commands.
  *
  */
 
@@ -65,7 +75,7 @@
 #define STATE_WAIT_THRES			0
 #define STATE_THRESHOLD_REACHED		1
 
-static unsigned int poll_threshold = DEFAULT_THRESHOLD;
+static unsigned int poll_threshold;
 static unsigned char state;
 
 
@@ -76,34 +86,48 @@ void sync_init(void)
 	TCNT1 = 0;
 
 	/* /64 divisor. Overflows every 262ms */
-
+	state = STATE_WAIT_THRES;
+	poll_threshold = DEFAULT_THRESHOLD;
 
 }
 
 void sync_master_polled_us(void)
 {
 	unsigned int elapsed;
-	elapsed = TCNT1;
+	int ignore_elapsed = 0;
 
-#ifdef OLD_MODE
-	if (elapsed > MIN_IDLE)
-		poll_threshold = 2; //MARGIN;
-#else
-	if (elapsed > MIN_IDLE)
-	{
-		if (elapsed > TIME_TO_POLL + MIN_IDLE + MARGIN) {
-			// Program the next GC poll at the last moment before the
-			// expected N64 poll.
-			poll_threshold = elapsed - TIME_TO_POLL - MARGIN;
-		} else {
-			poll_threshold = DEFAULT_THRESHOLD;
-		}
-	
-		if (poll_threshold < MIN_IDLE) {
-			poll_threshold = DEFAULT_THRESHOLD;
-		}
+	if (TIFR & (1<<TOV1)) {
+		TIFR |= 1<<TOV1; // clear overflow
+
+		/* The N64 is probably not polling. Revert to default
+		 * threshold instead of calculating an invalid one. */
+		poll_threshold = DEFAULT_THRESHOLD;
+		ignore_elapsed = 1;
 	}
+
+	if (!ignore_elapsed) {
+		elapsed = TCNT1;
+#ifdef OLD_MODE
+		if (elapsed > MIN_IDLE)
+			poll_threshold = 2; //MARGIN;
+#else
+		if (elapsed > MIN_IDLE)
+		{
+			if (elapsed > TIME_TO_POLL + MIN_IDLE + MARGIN) {
+				// Program the next GC poll at the last moment before the
+				// expected N64 poll.
+				poll_threshold = elapsed - TIME_TO_POLL - MARGIN;
+			} else {
+				poll_threshold = DEFAULT_THRESHOLD;
+			}
+		
+			if (poll_threshold < MIN_IDLE) {
+				poll_threshold = DEFAULT_THRESHOLD;
+			}
+		}
 #endif
+
+	}
 
 	/* Reset counter */
 	TCNT1 = 0;
@@ -121,15 +145,6 @@ char sync_may_poll(void)
 		}
 	}
 
-	if (TIFR & (1<<TOV1)) {
-		TIFR |= 1<<TOV1; // clear overflow
-
-		// Fire anyway?
-		state = STATE_WAIT_THRES;
-		poll_threshold = DEFAULT_THRESHOLD;
-		TCNT1 = 0;
-		return 1;
-	}
 		
 	return 0;
 }
