@@ -29,12 +29,15 @@
 //#include "n64_offsets.h"
 
 #include "n64_isr.h"
-
+#include "sync.h"
 #include "mapper.h"
 #include "gamecube_mapping.h"
 #include "n64_mapping.h"
 
 #include "eeprom.h"
+
+#define DEBUG_LOW()		do { PORTD &= ~(1); } while(0)
+#define DEBUG_HIGH()	do { PORTD |= 1; } while(0)
 
 Gamepad *gcpad;
 unsigned char gc_report[GC_REPORT_SIZE];
@@ -328,6 +331,9 @@ void menumain()
 	sreg = SREG;
 	cli();
 
+	// re-init buzzer (sync uses the same timer)
+	buzzer_init();
+
 	blips(5);
 
 	waitStartRelease();
@@ -393,9 +399,6 @@ void menumain()
 				}
 				mapper_change_mapping_entry(current_mapping, input, output);
 				blips(1);
-
-				
-
 				break;
 		}
 	}
@@ -407,11 +410,18 @@ error:
 	_delay_ms(700);
 	buzz(0);
 
+	// re-init sync. Buzzer uses the same timer...
+	sync_init();
+
 	SREG = sreg;
 	return;
 
 menu_done:
 	blips(3);
+
+	// re-init sync. Buzzer uses the same timer...
+	sync_init();
+
 
 	SREG = sreg;
 }
@@ -435,7 +445,7 @@ int domenu(struct mapping_controller_unit *gcs)
 	}
 	return 0;
 }
-void byteTo8Bytes(unsigned char val, unsigned char *dst)
+void byteTo8Bytes(unsigned char val, unsigned char volatile *dst)
 {
 	unsigned char c = 0x80;
 
@@ -580,6 +590,7 @@ int main(void)
 
 	gcpad->init();
 
+	DEBUG_HIGH();
 	_delay_ms(500);
 
 	/* Read from Gamecube controller */
@@ -590,19 +601,27 @@ int main(void)
 	if (g_gamecube_status[MAP_GC_BTN_START].value) {
 		menumain(g_gamecube_status);
 	}
+	
+	DEBUG_LOW();
 
+	sync_init();
 
 	while(1)
 	{
 		if (n64_got_command) {
 			n64_got_command = 0;
-			PORTD ^= 1;
-	
+			sync_master_polled_us();
+		}
+
+		if (sync_may_poll()) {	
+			DEBUG_HIGH();
 			timerIntOff();		
 			gcpad->update();
 			timerIntOn();
+			DEBUG_LOW();
 
 			if (gcpad->changed()) {
+				DEBUG_HIGH();
 				// Read the gamepad	
 				gcpad->buildReport(gc_report);				
 				
@@ -622,6 +641,7 @@ int main(void)
 				n64_status_to_output(g_n64_status, n64_use_buf1 ? n64_tx_buf0 : n64_tx_buf1);
 
 				n64_use_buf1 = !n64_use_buf1;
+				DEBUG_LOW();
 			}
 
 			domenu(g_gamecube_status);
