@@ -24,11 +24,8 @@
 // used to send a 8 bit command..
 int _n64Update(unsigned char tmp)
 {
-	int i;
-	unsigned char tmpdata[4];	
 	unsigned char volatile results[65];
 	unsigned char count;
-
 	
 	/*
 	 * z: Points to current source byte
