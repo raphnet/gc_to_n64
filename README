@@ -1,0 +1,19 @@
+Gamecube controller to N64 adapter project
+Copyright (C) 2011 Raphael Assenat <raph@raphnet.net>
+
+Source code licensed under the General Public License. 
+See gpl.txt for details.
+
+
+-= Project summary =-
+
+A common problem with the N64 controllers is the joystick. It wears down and 
+become unusable. However Gamecube controllers don't seem to wear down much 
+and are quite similar to the N64 controllers.
+
+So I've been asked many times if I could design an adapter for using Gamecube 
+controllers on a N64 system. This project is the result.
+
+For the latest source code, builds, schematic and instructions:
+
+http://www-test.lan.raphnet.net/electronique/gc_to_n64/index_en.php
