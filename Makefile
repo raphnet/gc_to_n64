@@ -5,8 +5,8 @@ LD=$(CC)
 CPU=atmega8
 UISP=uisp -dprog=stk500 -dpart=atmega8 -dserial=/dev/avr
 CFLAGS=-Wall -mmcu=$(CPU) -DF_CPU=16000000L -Os
-LDFLAGS=-mmcu=$(CPU) -Wl,-Map=n64_to_wii.map
-HEXFILE=n64_to_wii.hex
+LDFLAGS=-mmcu=$(CPU) -Wl,-Map=gc_to_n64.map
+HEXFILE=gc_to_n64.hex
 AVRDUDE=avrdude
 AVRDUDE_CPU=m8
 #AVRDUDE_CPU=m88
@@ -16,14 +16,14 @@ OBJS=main.o gamecube.o support.o n64_isr.o mapper.o gamecube_mapping.o n64_mappi
 all: $(HEXFILE)
 
 clean:
-	rm -f n64_to_wii.elf n64_to_wii.hex n64_to_wii.map $(OBJS)
+	rm -f gc_to_n64.elf gc_to_n64.hex gc_to_n64.map $(OBJS)
 
-n64_to_wii.elf: $(OBJS)
-	$(LD) $(OBJS) $(LDFLAGS) -o n64_to_wii.elf
+gc_to_n64.elf: $(OBJS)
+	$(LD) $(OBJS) $(LDFLAGS) -o gc_to_n64.elf
 
-n64_to_wii.hex: n64_to_wii.elf
-	avr-objcopy -j .data -j .text -O ihex n64_to_wii.elf n64_to_wii.hex
-	avr-size n64_to_wii.elf
+gc_to_n64.hex: gc_to_n64.elf
+	avr-objcopy -j .data -j .text -O ihex gc_to_n64.elf gc_to_n64.hex
+	avr-size gc_to_n64.elf
 
 fuse:
 	$(UISP) --wr_fuse_h=0xd9 --wr_fuse_l=0xdf --wr_fuse_e=0xf
