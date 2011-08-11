@@ -580,12 +580,18 @@ int main(void)
 	
 	sei();
 
-	eeprom_init();
+	buzzer_init();
+	if (eeprom_init()) {
+		/* This is to test the buzzer right
+		 * after programming completes. The next time
+		 * the board powers up the buzzer will be
+		 * silent, unless the eeprom got corrupted. */
+		blips(2);
+	}
 
 	loadMappingId(g_eeprom_data.defmap);	
 
 	
-	buzzer_init();
 	timerStart();
 
 	gcpad->init();

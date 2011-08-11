@@ -25,7 +25,7 @@ void eeprom_commit(void)
 	eeprom_write_block(&g_eeprom_data, (void*)0x00, sizeof(struct eeprom_data_struct));
 }
 
-void eeprom_init(void)
+int eeprom_init(void)
 {
 	char *magic = "GC2N64v1";
 	eeprom_read_block(&g_eeprom_data, (void*)0x00, sizeof(struct eeprom_data_struct));
@@ -40,6 +40,10 @@ void eeprom_init(void)
 		memset(g_eeprom_data.appdata, 0xff, EEPROM_APPDATA_SIZE);
 
 		eeprom_commit();
+
+		return 1;
 	}
+
+	return 0;
 }
 
