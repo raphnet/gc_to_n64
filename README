@@ -4,6 +4,9 @@ Copyright (C) 2011 Raphael Assenat <raph@raphnet.net>
 Source code licensed under the General Public License. 
 See gpl.txt for details.
 
+-= Relase history =-
+ * August 10, 2011 : Version 1.0. Initial relase.
+
 
 -= Project summary =-
 
@@ -17,3 +20,4 @@ controllers on a N64 system. This project is the result.
 For the latest source code, builds, schematic and instructions:
 
 http://www-test.lan.raphnet.net/electronique/gc_to_n64/index_en.php
+
