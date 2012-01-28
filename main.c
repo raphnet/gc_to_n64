@@ -16,12 +16,15 @@
 */
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include <util/delay.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
+#include <avr/pgmspace.h>
 
 #include "buzzer.h"
 #include "timer0.h"
+#include "lut.h"
 
 #include "gamecube.h"
 
@@ -456,13 +459,88 @@ void byteTo8Bytes(unsigned char val, unsigned char volatile *dst)
 	} while(c);
 }
 
-unsigned char scaleValue(unsigned char raw)
+static char gc_x_origin = 0;
+static char gc_y_origin = 0;
+
+static void setOriginsFromReport(const unsigned char gcr[GC_REPORT_SIZE])
 {
-	return ((char)raw) * 24000L / 32767L;
+	// Signed origin
+	gc_x_origin = gcr[0]^0x80;
+	gc_y_origin = gcr[1]^0x80;
 }
 
+/* 
+ * \return N64 axis data (unsigned)
+ * */
+static int calb(char orig, unsigned char val)
+{
+	signed short tmp;
 
+	tmp = (signed char)(val^0x80) - orig;
 
+//	tmp = tmp * 31000L / 32000L;
+
+	if (tmp<=-127)
+		tmp = -127;
+
+	if (tmp>127)
+		tmp = 127;
+
+	if (tmp<0) {
+		tmp = -((char)(pgm_read_byte(&correction_lut[tmp*-2])/2));
+	} else {
+		tmp = (char)(pgm_read_byte(&correction_lut[tmp*2])/2);
+	}
+
+	return tmp; // ((unsigned char)tmp ^ 0x80);
+}
+
+static void gamecubeXYtoN64(unsigned char x, unsigned char y, char *dst_x, char *dst_y)
+{
+	unsigned char abs_y, abs_x;
+	long sig_x, sig_y;
+	long sx, sy;
+	long l = 1700;
+
+	sig_x = calb(gc_x_origin, x);
+	sig_y = calb(gc_y_origin, y);
+
+	abs_y = abs(sig_y);
+	abs_x = abs(sig_x);
+
+	if (1) {
+		sx = sig_x + sig_x * abs_y / l;
+		sy = sig_y + sig_y * abs_x / l;
+	} else {
+		sx = sig_x;
+		sy = sig_y;
+	}
+
+	if (sx<=-127)
+		sx = -127;
+	if (sx>127)
+		sx = 127;
+	if (sy<=-127)
+		sy = -127;
+	if (sy>127)
+		sy = 127;
+
+	*dst_x = sx;
+	*dst_y = sy;
+}
+/*
+static unsigned char gamecubeXtoN64(unsigned char raw)
+{
+	return calb(gc_x_origin, raw);
+	//return ((char)raw) * 24000L / 32767L;
+}
+
+static unsigned char gamecubeYtoN64(unsigned char raw)
+{
+	return calb(gc_y_origin, raw);
+	//return ((char)raw) * 24000L / 32767L;
+}
+*/
 static void gc_report_to_mapping(const unsigned char gcr[GC_REPORT_SIZE], struct mapping_controller_unit *gcs)
 {
 	gcs[MAP_GC_BTN_A].value = gcr[6] & 0x10;
@@ -482,8 +560,9 @@ static void gc_report_to_mapping(const unsigned char gcr[GC_REPORT_SIZE], struct
 	gcs[MAP_GC_BTN_DPAD_LEFT].value = gcr[7] & 0x08;
 	gcs[MAP_GC_BTN_DPAD_RIGHT].value = gcr[7] & 0x04;
 
-	gcs[MAP_GC_AXIS_LEFT_RIGHT].value = scaleValue(gcr[0]^0x80);
-	gcs[MAP_GC_AXIS_UP_DOWN].value = scaleValue(gcr[1]^0x80);
+	gamecubeXYtoN64(gcr[0], gcr[1], &gcs[MAP_GC_AXIS_LEFT_RIGHT].value, &gcs[MAP_GC_AXIS_UP_DOWN].value);
+//	gcs[MAP_GC_AXIS_LEFT_RIGHT].value = gamecubeXtoN64(gcr[0]);
+//	gcs[MAP_GC_AXIS_UP_DOWN].value = gamecubeYtoN64(gcr[1]);
 	
 	gcs[MAP_GC_BTN_X].value = gcr[6] & 0x04;
 	gcs[MAP_GC_BTN_Y].value = gcr[6] & 0x02;
@@ -602,7 +681,12 @@ int main(void)
 	/* Read from Gamecube controller */
 	gcpad->update();
 	gcpad->buildReport(gc_report);
+
+	// Learn the joystick origin to use
+	setOriginsFromReport(gc_report);
+
 	gc_report_to_mapping(gc_report, g_gamecube_status);
+
 
 	if (g_gamecube_status[MAP_GC_BTN_START].value) {
 		menumain(g_gamecube_status);
