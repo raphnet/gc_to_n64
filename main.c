@@ -478,20 +478,20 @@ static int calb(char orig, unsigned char val)
 
 	tmp = (signed char)(val^0x80) - orig;
 
-//	tmp = tmp * 31000L / 32000L;
+	tmp = tmp * 31000L / 32000L;
 
 	if (tmp<=-127)
 		tmp = -127;
 
 	if (tmp>127)
 		tmp = 127;
-
+/*	
 	if (tmp<0) {
 		tmp = -((char)(pgm_read_byte(&correction_lut[tmp*-2])/2));
 	} else {
 		tmp = (char)(pgm_read_byte(&correction_lut[tmp*2])/2);
 	}
-
+*/
 	return tmp; // ((unsigned char)tmp ^ 0x80);
 }
 
@@ -500,7 +500,8 @@ static void gamecubeXYtoN64(unsigned char x, unsigned char y, char *dst_x, char 
 	unsigned char abs_y, abs_x;
 	long sig_x, sig_y;
 	long sx, sy;
-	long l = 1700;
+	//long l = 1700; // THe lower, the stronger the correction. 32768 means null correction
+	long l = 16000; // THe lower, the stronger the correction. 32768 means null correction
 
 	sig_x = calb(gc_x_origin, x);
 	sig_y = calb(gc_y_origin, y);
