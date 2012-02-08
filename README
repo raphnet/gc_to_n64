@@ -1,11 +1,25 @@
 Gamecube controller to N64 adapter project
-Copyright (C) 2011 Raphael Assenat <raph@raphnet.net>
+Copyright (C) 2011-2012 Raphael Assenat <raph@raphnet.net>
 
 Source code licensed under the General Public License. 
 See gpl.txt for details.
 
 -= Relase history =-
- * August 10, 2011 : Version 1.0. Initial relase.
+* January 25, 2011 : Version 1.1. Compatiblity fixes:
+
+    - Auto-calibration of the gamecube joystick at powerup fixes
+	  compatiblity issues with controllers that are not *perfectly*
+	  centered.
+
+	- Better conversion from Gamecube axis values to N64 values. This
+	  fixes issues with some game/controllers where, for instance, 
+	  the character would not run at full speed.
+
+	Note: The maximum axis values and corner angles closely approximates
+    those from a N64 Hori mini pad.
+
+
+* August 10, 2011 : Version 1.0. Initial relase.
 
 
 -= Project summary =-
@@ -19,5 +33,5 @@ controllers on a N64 system. This project is the result.
 
 For the latest source code, builds, schematic and instructions:
 
-http://www-test.lan.raphnet.net/electronique/gc_to_n64/index_en.php
+http://www.raphnet.net/electronique/gc_to_n64/index_en.php
 
