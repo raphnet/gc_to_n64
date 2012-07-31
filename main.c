@@ -726,6 +726,8 @@ wait_for_controller:
 				read_fail_count++;
 				if (read_fail_count > READ_FAIL_LIMIT)
 					goto wait_for_controller;
+			} else {
+				read_fail_count = 0;
 			}
 
 			if (gcpad->changed()) {

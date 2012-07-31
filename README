@@ -6,6 +6,10 @@ See gpl.txt for details.
 
 -= Relase history =-
 
+July 31, 2012 : Version 1.2.1 - Quick bug fix
+    - Reset the read failure counter on success. Otherwise the failures
+	  accumulate and eventually forces a recalibration, potentially in-game.
+
 July 30, 2012 : Version 1.2 - Bug fixes and maintenance
 
 	- Auto-calibration is now done each time a new controller
