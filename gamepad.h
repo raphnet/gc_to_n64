@@ -12,7 +12,7 @@ typedef struct {
 	void *deviceDescriptor; // must be in flash
 	
 	void (*init)(void);
-	char (*update)(void);
+	char (*update)(char origin);
 	char (*changed)(void);
 	void (*buildReport)(unsigned char *buf);
 

@@ -21,27 +21,20 @@
 #include <string.h>
 #include "gamepad.h"
 #include "gamecube.h"
-#include "support.h"
 #include "boarddef.h"
-
-#define NEW_COMM_CODE
+#include "gcn64_protocol.h"
 
 /*********** prototypes *************/
 static void gamecubeInit(void);
-static char gamecubeUpdate(void);
+static char gamecubeUpdate(char);
 static char gamecubeChanged(void);
 static void gamecubeBuildReport(unsigned char *reportBuffer);
-
-static int gc_rumbling = 1;
 
 /* What was most recently read from the controller */
 static unsigned char last_built_report[GC_REPORT_SIZE];
 
 /* What was most recently sent to the host */
 static unsigned char last_sent_report[GC_REPORT_SIZE];
-
-/* For probe */
-static char last_failed;
 
 static void gamecubeInit(void)
 {
@@ -61,324 +54,13 @@ static void gamecubeInit(void)
 
 	SREG = sreg;
 
-	gamecubeUpdate();
-
+	gamecubeUpdate(GAMECUBE_UPDATE_ORIGIN);
 }
 
-/**
- * \brief Receive N64/GC style data
- *
- * \param dstbuf Destination buffer
- * \return The number of received bytes. 0 means nothing or overflow.
- *
- * This function times the low and high states
- * of the N64/GC bus until the buffer is filled
- * with level timings or timeout.
- */
-static unsigned char gc_receive(unsigned char dstbuf[256])
+void gc_decodeAnswer()
 {
-	unsigned char count;
-	
-	// The data line has been released. 
-	// The receive part below expects it to be still high
-	// and will wait for it to become low before beginning
-	// the counting.
-	asm volatile(
-		"	push r30				\n"	// save Z
-		"	push r31				\n"	// save Z
-
-//		"	sbi %3,1				\n" // DEBUG
-
-		"	clr %0					\n"
-		"	clr r16					\n"
-"initial_wait_low:\n"
-		"	inc r16					\n"
-		"	breq gc_timeout			\n" // overflow to 0
-		"	sbic %2, 3				\n"	
-		"	rjmp initial_wait_low	\n"
-
-		"	nop\n"
-		//"	cbi %3, 1				\n" // DEBUG
-	
-		// the next transition is to a high bit	
-		"	rjmp waithigh			\n"
-
-"waitlow:\n"
-		"	clr r16					\n"
-"waitlow_lp:\n"
-		"	inc r16					\n"
-		"	breq gc_timeout			\n" // overflow to 0
-		"	sbic %2, 3				\n"
-		"	rjmp waitlow_lp			\n"
-	
-		"	inc %0					\n" // count this timed low level
-		"	breq overflow			\n"
-		"	st z+,r16				\n"
-
-"waithigh:\n"
-		"	clr r16					\n"
-"waithigh_lp:\n"
-		"	inc r16					\n"
-		"	breq gc_timeout			\n" // overflow to 0
-		"	sbis %2, 3				\n"
-		"	rjmp waithigh_lp		\n"
-	
-		"	inc %0					\n" // count this timed high level
-		"	breq overflow			\n"
-		"	st z+,r16				\n"
-
-		"	rjmp waitlow			\n"
-
-"overflow:  \n"
-		"	nop\n"
-//		"	sbi %3,1				\n" // DEBUG
-"gc_timeout:	\n"
-"			pop r31				\n" // restore z
-"			pop r30				\n" // restore z
-
-		: 	"=r" (count)						// %0
-		: 	"z"((volatile void*)dstbuf),		// %1
-			"I" (_SFR_IO_ADDR(GC_DATA_PIN)),	// %2
-			"I" (_SFR_IO_ADDR(PORTB))			// %3
-		: 	"r16"
-	);
-
-	return count;
-}
-
-static char gamecubeUpdate(void)
-{
-	int i;
-	unsigned char tmp=0;
 	unsigned char tmpdata[8];	
-	unsigned char results[256];
-	unsigned char count;
-
-	/* Use N64.c functionality to send a 8 bit
-	 * command. In this case, it is the GetID 
-	 * command. This is required for the Nintendo 
-	 * Wavebird to work... */
-	_n64Update(0x00);
-
-	/* 
-	 * The wavebird needs time. It does not answer the 
-	 * folowwing get status command if we don't wait here.
-	 *
-	 * A good 2:1 safety margin has been chosen.
-	 *
-	 */
-	// 10 : does not work
-	// 20 : does not work
-	// 25 : works
-	// 30 : works
-	_delay_us(50);
-	
-	tmp = 0x00; // get status
-	/*
-	 * z: Points to current source byte
-	 * r16: Holds the bit to be AND'ed with current byte
-	 * r17: Holds the current byte
-	 * r18: Holds the number of bits left to send.
-	 * r19: Loop counter for delays
-	 *
-	 * Edit sbi/cbi/andi instructions to use the right bit!
-	 * 
-	 * 3 us == 36 cycles
-	 * 1 us == 12 cycles
-	 *
-	 * Note: I know the code below is not very clean... but it works.
-	 */
-	asm volatile(
-"			push r30				\n"
-"			push r31				\n"
-
-"			ldi r16, 0x80			\n" // 1
-"nextBit:							\n" 
-"			ldi r17, 0x40				\n" // 2		// BITS 0-7 (MSB sent first)
-"			and r17, r16			\n" // 1
-"			breq send0				\n" // 2
-"			nop						\n"
-
-"send1:								\n"
-"			sbi %1, 3				\n" // 2
-"				nop\nnop\nnop\nnop	\n" // 4
-"				nop\nnop\nnop\nnop	\n" // 4
-"				nop\nnop\nnop\nnop	\n" // 4
-"				nop\nnop\n			\n" // 3
-"			cbi %1, 3				\n" // 2
-"				ldi r19, 12			\n"	// 1 
-"lp1:			dec r19				\n"	// 1 
-"				brne lp1			\n"	// 2
-"				nop\nnop			\n" // 2
-"			lsr r16					\n" // 1
-"			breq done				\n" // 1
-"			rjmp nextBit			\n" // 2
-		
-"send0:		sbi %1, 3				\n"	// 2
-"				ldi r19, 15			\n"	// 1
-"lp0:			dec r19				\n"	// 1
-"				brne lp0			\n"	// 2
-"				nop					\n" // 1
-
-"          	cbi %1,3				\n" // 2
-"				nop\nnop\n				\n" // 2
-"				nop\nnop\nnop\nnop	\n" // 4
-
-"			lsr r16					\n" // 1
-"			breq done				\n" // 1
-"			rjmp nextBit			\n" // 2
-
-"done:								\n"
-"			cbi %1, 3				\n"
-
-
-///////////////////////////////////////////// BITS 8-15
-
-"			ldi r16, 0x80			\n" // 1
-"nextBitA:							\n" 
-"			ldi r17, 0x03			\n" // 2			// BITS 8-15
-"			and r17, r16			\n" // 1
-"			breq send0A				\n" // 2
-"			nop						\n"
-
-//"send1:								\n"
-"			sbi %1, 3				\n" // 2
-"				nop\nnop\nnop\nnop	\n" // 4
-"				nop\nnop\nnop\nnop	\n" // 4
-"				nop\nnop\nnop\nnop	\n" // 4
-"				nop\nnop\n			\n" // 3
-"			cbi %1, 3				\n" // 2
-"				ldi r19, 12			\n"	// 1 
-"lp1A:			dec r19				\n"	// 1 
-"				brne lp1A			\n"	// 2
-"				nop\nnop			\n" // 2
-"			lsr r16					\n" // 1
-"			breq doneA				\n" // 1
-"			rjmp nextBitA			\n" // 2
-		
-"send0A:	sbi %1, 3				\n"	// 2
-"				ldi r19, 15			\n"	// 1
-"lp0A:			dec r19				\n"	// 1
-"				brne lp0A			\n"	// 2
-"				nop					\n" // 1
-
-"          	cbi %1,3				\n" // 2
-"				nop\nnop\n				\n" // 2
-"				nop\nnop\nnop\nnop	\n" // 4
-
-"			lsr r16					\n" // 1
-"			breq doneA				\n" // 1
-"			rjmp nextBitA			\n" // 2
-
-"doneA:								\n"
-"			cbi %1, 3				\n"
-
-////////////////////////// BITS 16-23
-"			ldi r16, 0x80			\n" // 1
-"nextBitB:							\n" 
-"			mov r17, %2				\n" // 2 		// BITS 16-23
-"			and r17, r16			\n" // 1
-"			breq send0B				\n" // 2
-"			nop						\n"
-
-//"send1B:								\n"
-"			sbi %1, 3				\n" // 2
-"				nop\nnop\nnop\nnop	\n" // 4
-"				nop\nnop\nnop\nnop	\n" // 4
-"				nop\nnop\nnop\nnop	\n" // 4
-"				nop\nnop\n			\n" // 3
-"			cbi %1, 3				\n" // 2
-"				ldi r19, 12			\n"	// 1 
-"lp1B:			dec r19				\n"	// 1 
-"				brne lp1B			\n"	// 2
-"				nop\nnop			\n" // 2
-"			lsr r16					\n" // 1
-"			breq doneB				\n" // 1
-"			rjmp nextBitB			\n" // 2
-		
-"send0B:	sbi %1, 3				\n"	// 2
-"				ldi r19, 15			\n"	// 1
-"lp0B:			dec r19				\n"	// 1
-"				brne lp0B			\n"	// 2
-"				nop					\n" // 1
-
-"          	cbi %1,3				\n" // 2
-"				nop\nnop\n				\n" // 2
-"				nop\nnop\nnop\nnop	\n" // 4
-
-"			lsr r16					\n" // 1
-"			breq doneB				\n" // 1
-"			rjmp nextBitB			\n" // 2
-
-"doneB:								\n"
-"			cbi %1, 3				\n"
-"			nop\nnop\nnop\nnop		\n"	// 4
-
-
-// Stop bit (1us low, 3us high)
-"          	sbi %1, 3				\n" // 2
-"			nop\nnop\nnop\nnop		\n" // 4
-"			nop\nnop\nnop\nnop		\n" // 4
-"			nop\nnop\nnop\nnop		\n" // 4
-"			nop\nnop\nnop\nnop		\n" // 4
-"			cbi %1, 3				\n" 
-
-"			nop\nnop\nnop\nnop		\n" // 4
-"			nop\nnop\nnop\nnop		\n" // 4
-			
-"anti_slow_rise:\n"
-"			in r17, %4\n"
-"           andi r17, 0x08\n"
-"           breq anti_slow_rise\n"
-
-			// Response reading part //
-			// r16: loop Counter
-			// r17: Reference state
-			// r18: Current state
-			// r19: bit counter
-		
-"			ldi r19, 64\n			" // 1  We will receive 32 bits
-
-"st:\n								"
-"			ldi r16, 0x3f			\n" // setup a timeout
-"waitFall:							\n" 
-"			dec r16					\n" // 1
-"			breq timeout			\n" // 1 
-"			in r17, %4				\n" // 1  read the input port
-"			andi r17, 0x08			\n" // 1  isolate the input bit
-"			brne waitFall			\n" // 2  if still high, loop
-
-
-"timeout:							\n"
-"			clr %0					\n"
-"			com %0					\n" // 255 is timeout
-
-"end:\n"
-"			pop r31\n"
-"			pop r30\n"
-"			cbi %5, 1\n"
-			: "=r" (count)
-			: "I" (_SFR_IO_ADDR(GC_DATA_DDR)), "r"(tmp), 
-				"z"(results), "I" (_SFR_IO_ADDR(GC_DATA_PIN)),
-				"I" (_SFR_IO_ADDR(PORTB))
-			: "r16","r17","r18","r19"
-			);
-
-
-	count = gc_receive(results);
-
-	if (count != 129) {
-		last_failed = 1;
-		return 1; // failure
-	}
-	
-	for (i=0; i<count/2; i++)
-	{
-		results[i] = 
-			results[i*2] < results[i*2+1] ? 1 : 0;
-
-	}
-
+	int i;
 
 	// Note: Checking seems a good idea, adds protection
 	// against corruption (if the "constant" bits are invalid, 
@@ -390,10 +72,10 @@ static char gamecubeUpdate(void)
 
 	// Check the always 0 and always 1 bits
 #if 0
-	if (results[0] || results[1] || results[2])
+	if (gcn64_workbuf[0] || gcn64_workbuf[1] || gcn64_workbuf[2])
 		return 1;
 
-	if (!results[8])
+	if (!gcn64_workbuf[8])
 		return 1;
 #endif
 	
@@ -427,40 +109,33 @@ static char gamecubeUpdate(void)
 	memset(tmpdata, 0, sizeof(tmpdata));
 
 	for (i=0; i<8; i++) // X axis
-		tmpdata[0] |= results[i+16] ? (0x80>>i) : 0;
+		tmpdata[0] |= gcn64_workbuf[i+16] ? (0x80>>i) : 0;
 	
 	for (i=0; i<8; i++) // Y axis
-		tmpdata[1] |= results[i+24] ? (0x80>>i) : 0;
+		tmpdata[1] |= gcn64_workbuf[i+24] ? (0x80>>i) : 0;
 	tmpdata[1] ^= 0xff;
 
 	for (i=0; i<8; i++) // C X axis
-		tmpdata[2] |= results[i+32] ? (0x80>>i) : 0;
+		tmpdata[2] |= gcn64_workbuf[i+32] ? (0x80>>i) : 0;
 
-	// Raph: October 2007. C stick vertical orientation 
-	// was wrong. But no one complained...
-#if INVERTED_VERTICAL_C_STICK
 	for (i=0; i<8; i++) // C Y axis
-		tmpdata[3] |= results[i+40] ? (0x80>>i) : 0;	
-#else
-	for (i=0; i<8; i++) // C Y axis
-		tmpdata[3] |= results[i+40] ? 0 : (0x80>>i);	
-#endif
+		tmpdata[3] |= gcn64_workbuf[i+40] ? 0 : (0x80>>i);	
 
 	for (i=0; i<8; i++) // Left btn value
-		tmpdata[4] |= results[i+48] ? (0x80>>i) : 0;
+		tmpdata[4] |= gcn64_workbuf[i+48] ? (0x80>>i) : 0;
 	tmpdata[4] ^= 0xff;
 	
 	for (i=0; i<8; i++) // Right btn value
-		tmpdata[5] |= results[i+56] ? (0x80>>i) : 0;	
+		tmpdata[5] |= gcn64_workbuf[i+56] ? (0x80>>i) : 0;	
 	tmpdata[5] ^= 0xff;
 
 	for (i=0; i<5; i++) // St Y X B A
-		tmpdata[6] |= results[i+3] ? (0x01<<i) : 0;
+		tmpdata[6] |= gcn64_workbuf[i+3] ? (0x01<<i) : 0;
 	for (i=0; i<3; i++) // L R Z
-		tmpdata[6] |= results[i+9] ? (0x20<<i) : 0;
+		tmpdata[6] |= gcn64_workbuf[i+9] ? (0x20<<i) : 0;
 	
 	for (i=0; i<4; i++) // Up,Down,Right,Left
-		tmpdata[7] |= results[i+12] ? (0x01<<i) : 0;
+		tmpdata[7] |= gcn64_workbuf[i+12] ? (0x01<<i) : 0;
 
 	// analog joysticks
 	for (i=0; i<6; i++) {
@@ -470,20 +145,78 @@ static char gamecubeUpdate(void)
 	// buttons
 	last_built_report[6] = tmpdata[6];
 	last_built_report[7] = tmpdata[7];
+}
 
-	return 0; // success
+
+static char gamecubeUpdate(char origin)
+{
+	unsigned char tmp=0;
+	unsigned char tmpdata[8];
+	unsigned char count;
+
+
+	/* The GetID command. This is required for the Nintendo Wavebird to work... */
+	tmp = GC_GETID;
+	count = gcn64_transaction(&tmp, 1);
+	if (count != GC_GETID_REPLY_LENGTH) {
+		return 1;
+	}
+
+	/* 
+	 * The wavebird needs time. It does not answer the 
+	 * folowwing get status command if we don't wait here.
+	 *
+	 * A good 2:1 safety margin has been chosen.
+	 *
+	 */
+	// 10 : does not work
+	// 20 : does not work
+	// 25 : works
+	// 30 : works
+	_delay_us(50);
+
+	if (origin)	{
+		// Ok... at first I was trying a so-called 'get origin command' (0x41) to work,
+		// but it did nothing on the wavebird. But this command seems to work. The document
+		// Yet another gamecube documentation says 'calibrate ?'. 
+		//
+		// Wavebird: Fixed data
+		// Normal controller: Varies
+		//
+		// The answer is 80 bits with the first 64 bits have the same as with 
+		// the GET_STATUS command.
+		tmpdata[0] = 0x42;
+		tmpdata[1] = 0x03;
+		tmpdata[2] = 0x02;
+		
+		count = gcn64_transaction(tmpdata, 3);
+		if (count != 80) {
+			return 1;
+		}
+	} else {
+		tmpdata[0] = GC_GETSTATUS1;
+		tmpdata[1] = GC_GETSTATUS2;
+		tmpdata[2] = GC_GETSTATUS3(0);
+		
+		count = gcn64_transaction(tmpdata, 3);
+		if (count != GC_GETSTATUS_REPLY_LENGTH) {
+			return 1;
+		}
+	}
+
+	gc_decodeAnswer();
+
+	return 0;
 }
 
 
 static char gamecubeProbe(void)
 {
-	last_failed = 0;
-	gamecubeUpdate();
+	if (gamecubeUpdate(GAMECUBE_UPDATE_ORIGIN)) {
+		return 0;
+	}
 
-	if (!last_failed)
-		return 1;
-
-	return 0;
+	return 1;
 }
 
 static char gamecubeChanged(void)

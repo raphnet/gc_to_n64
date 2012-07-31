@@ -1,5 +1,5 @@
 /*  GC to N64 : Gamecube controller to N64 adapter firmware
-    Copyright (C) 2011  Raphael Assenat <raph@raphnet.net>
+    Copyright (C) 2011-2012  Raphael Assenat <raph@raphnet.net>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -38,6 +38,11 @@
 #include "n64_mapping.h"
 
 #include "eeprom.h"
+
+/* After this many read failures in a row, consider the controller
+ * gone and wait for a new one. (whose first read will be considered
+ * the origin) */
+#define READ_FAIL_LIMIT		20
 
 #define DEBUG_LOW()		do { PORTD &= ~(1); } while(0)
 #define DEBUG_HIGH()	do { PORTD |= 1; } while(0)
@@ -136,8 +141,7 @@ static void waitStartRelease(void)
 {
 	while(1)
 	{
-
-		gcpad->update();
+		gcpad->update(GAMECUBE_UPDATE_NORMAL);
 		gcpad->buildReport(gc_report);
 		gc_report_to_mapping(gc_report, g_gamecube_status);
 
@@ -155,7 +159,7 @@ static int getEvent(void)
 	while(1)
 	{
 		_delay_ms(16);
-		gcpad->update();
+		gcpad->update(GAMECUBE_UPDATE_NORMAL);
 		if (gcpad->changed()) {
 			int now = 0;
 			// Read the gamepad	
@@ -620,9 +624,9 @@ void n64_status_to_output(struct mapping_controller_unit *n64s, unsigned char vo
 
 }
 
-
 int main(void)
 {
+	char res, read_fail_count = 0;
 	
 	gcpad = gamecubeGetGamepad();
 
@@ -679,8 +683,15 @@ int main(void)
 	DEBUG_HIGH();
 	_delay_ms(500);
 
-	/* Read from Gamecube controller */
-	gcpad->update();
+	/* Read from Gamecube controller. As long as this fails,
+	 * keep trying. We need the initial read to use as origin
+	 * position. */
+wait_for_controller:
+	while (0 != (res = gcpad->update(GAMECUBE_UPDATE_ORIGIN))) {
+		_delay_ms(16);
+	}
+	read_fail_count = 0;
+
 	gcpad->buildReport(gc_report);
 
 	// Learn the joystick origin to use
@@ -707,9 +718,15 @@ int main(void)
 		if (sync_may_poll()) {	
 			DEBUG_HIGH();
 			timerIntOff();		
-			gcpad->update();
+			res = gcpad->update(GAMECUBE_UPDATE_NORMAL);
 			timerIntOn();
 			DEBUG_LOW();
+
+			if (res) {
+				read_fail_count++;
+				if (read_fail_count > READ_FAIL_LIMIT)
+					goto wait_for_controller;
+			}
 
 			if (gcpad->changed()) {
 				DEBUG_HIGH();

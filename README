@@ -5,7 +5,17 @@ Source code licensed under the General Public License.
 See gpl.txt for details.
 
 -= Relase history =-
-* January 25, 2011 : Version 1.1. Compatiblity fixes:
+
+July 30, 2012 : Version 1.2 - Bug fixes and maintenance
+
+	- Auto-calibration is now done each time a new controller
+	  is connected, which means controllers can be swapped at runtime.
+	- The above makes the Wavebird work properly again (was broken in v1.1!)
+	- At powerup, the adapter waits for a Gamecube controller.
+	- A newer version of the Gamecube communication code (ported from my
+	  N64/Gamecube to USB project) is now in place.
+
+January 25, 2011 : Version 1.1. Compatiblity fixes:
 
     - Auto-calibration of the gamecube joystick at powerup fixes
 	  compatiblity issues with controllers that are not *perfectly*
@@ -18,8 +28,7 @@ See gpl.txt for details.
 	Note: The maximum axis values and corner angles closely approximates
     those from a N64 Hori mini pad.
 
-
-* August 10, 2011 : Version 1.0. Initial relase.
+August 10, 2011 : Version 1.0. Initial relase.
 
 
 -= Project summary =-
