@@ -75,8 +75,8 @@ struct mapping_entry gamecube_to_n64_default_mapping[MAP_GC_NONE + 2] = {
 	{ MAP_GC_AXB_JOY_DOWN,		MAP_N64_NONE },
 	{ MAP_GC_AXB_JOY_LEFT,		MAP_N64_NONE },
 	{ MAP_GC_AXB_JOY_RIGHT,		MAP_N64_NONE },
-	{ MAP_GC_AXB_L_SLIDER,		MAP_N64_BTN_L },
-	{ MAP_GC_AXB_R_SLIDER,		MAP_N64_BTN_R },
+	{ MAP_GC_AXB_L_SLIDER,		MAP_N64_NONE },
+	{ MAP_GC_AXB_R_SLIDER,		MAP_N64_NONE },
 	{ MAP_GC_AXIS_C_LEFT_RIGHT,	MAP_N64_NONE },
 	{ MAP_GC_AXIS_C_UP_DOWN,	MAP_N64_NONE },
 	{ MAP_GC_NONE,				MAP_N64_NONE },
@@ -665,6 +665,8 @@ int main(void)
 	sei();
 
 	buzzer_init();
+	blips(1);
+
 	if (eeprom_init()) {
 		/* This is to test the buzzer right
 		 * after programming completes. The next time
@@ -724,8 +726,10 @@ wait_for_controller:
 
 			if (res) {
 				read_fail_count++;
-				if (read_fail_count > READ_FAIL_LIMIT)
+				if (read_fail_count > READ_FAIL_LIMIT) {
+					blips(1);
 					goto wait_for_controller;
+				}
 			} else {
 				read_fail_count = 0;
 			}
