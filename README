@@ -1,10 +1,15 @@
 Gamecube controller to N64 adapter project
-Copyright (C) 2011-2012 Raphael Assenat <raph@raphnet.net>
+Copyright (C) 2011-2013 Raphael Assenat <raph@raphnet.net>
 
 Source code licensed under the General Public License. 
 See gpl.txt for details.
 
 -= Relase history =-
+
+February 12, 2013 : Version 1.2.2 - Bug fixes and minor features
+    - The analog L and R sliders are now unmapped by default.
+    - Beep on read errors (when disconnecting controller).
+    - Beep once at powerup.
 
 July 31, 2012 : Version 1.2.1 - Quick bug fix
     - Reset the read failure counter on success. Otherwise the failures
