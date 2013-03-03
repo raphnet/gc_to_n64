@@ -119,6 +119,11 @@ int loadMappingId(int id)
 	return 0;
 }
 
+void toggleDeadzone(void)
+{
+	g_eeprom_data.deadzone_enabled = !g_eeprom_data.deadzone_enabled;
+	eeprom_commit();
+}
 
 #define EV_BTN_A		0x001
 #define EV_BTN_B		0x002
@@ -323,6 +328,10 @@ int rmenu_do()
 			loadMappingId(0);
 			break;
 
+		case EV_BTN_Z:
+			toggleDeadzone();
+			break;
+
 		default:
 			return -1;
 	}
@@ -478,11 +487,36 @@ static void setOriginsFromReport(const unsigned char gcr[GC_REPORT_SIZE])
  * */
 static int calb(char orig, unsigned char val)
 {
-	signed short tmp;
+	short tmp;
+	long mult = 25000;
+	char dz=0;
+
+	if (g_eeprom_data.deadzone_enabled) {
+		dz = 12;
+		mult = 29000;
+	}
 
 	tmp = (signed char)(val^0x80) - orig;
 
-	tmp = tmp * 31000L / 32000L;
+	if (dz) {
+		if (tmp > 0) {
+			if (tmp < dz) {
+				tmp = 0;
+			} else {
+				tmp -= dz;
+			}
+		}
+		else if (tmp < 0) {
+			if (tmp > -dz) {
+				tmp = 0;
+			} else {
+				tmp += dz;
+			}
+		}
+	}
+
+	//tmp = tmp * 31000L / 32000L;
+	tmp = tmp * mult / 32000L;
 
 	if (tmp<=-127)
 		tmp = -127;
@@ -496,6 +530,13 @@ static int calb(char orig, unsigned char val)
 		tmp = (char)(pgm_read_byte(&correction_lut[tmp*2])/2);
 	}
 */
+	//   
+	//   Real N64 x axis
+	// -68 0 63
+	// -79 0 78
+	// -68 0 66
+	//
+
 	return tmp; // ((unsigned char)tmp ^ 0x80);
 }
 
@@ -505,7 +546,8 @@ static void gamecubeXYtoN64(unsigned char x, unsigned char y, char *dst_x, char 
 	long sig_x, sig_y;
 	long sx, sy;
 	//long l = 1700; // THe lower, the stronger the correction. 32768 means null correction
-	long l = 16000; // THe lower, the stronger the correction. 32768 means null correction
+	//long l = 16000; // THe lower, the stronger the correction. 32768 means null correction
+	long l = 512; // THe lower, the stronger the correction. 32768 means null correction
 
 	sig_x = calb(gc_x_origin, x);
 	sig_y = calb(gc_y_origin, y);

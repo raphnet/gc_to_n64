@@ -35,6 +35,7 @@ int eeprom_init(void)
 		memcpy(g_eeprom_data.magic, magic, EEPROM_MAGIC_SIZE);
 
 		g_eeprom_data.defmap = 0;
+		g_eeprom_data.deadzone_enabled = 0;
 
 		// This fill lets default mappings be empty (-1,-1 being the terminator)
 		memset(g_eeprom_data.appdata, 0xff, EEPROM_APPDATA_SIZE);

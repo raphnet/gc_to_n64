@@ -11,6 +11,7 @@
 struct eeprom_data_struct {
 	unsigned char magic[EEPROM_MAGIC_SIZE]; /* 'TenkiCfg' */
 	unsigned char defmap;
+	unsigned char deadzone_enabled;
 	unsigned char appdata[EEPROM_APPDATA_SIZE];
 };
 
