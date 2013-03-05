@@ -6,6 +6,13 @@ See gpl.txt for details.
 
 -= Relase history =-
 
+March 2, 2013 : Version 1.3 
+    - Added a joystick deadzone feature (default OFF). To enable, 
+	or disable if previously enabled, hold START until your hear the 5 
+	beeps, fully press and release R, the press Z. Wait a few moments 
+	for the final beeps. The setting is stored in the adapter, no need
+	 to repeat after each power up. 
+
 February 12, 2013 : Version 1.2.2 - Bug fixes and minor features
     - The analog L and R sliders are now unmapped by default.
     - Beep on read errors (when disconnecting controller).
