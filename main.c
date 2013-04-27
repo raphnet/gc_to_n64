@@ -344,6 +344,7 @@ void menumain()
 	int ev, res;
 	unsigned char sreg;
 	int input=-1, output=-1;
+	int firstMappingPairInSession = 1;
 	sreg = SREG;
 	cli();
 
@@ -413,6 +414,15 @@ void menumain()
 				if (input == -1 || output == -1) {
 					goto error;
 				}
+
+				if (firstMappingPairInSession) {
+					// When a new code is entered, we must start
+					// from a clean copy of the default mapping. Otherwise
+					// the changes are cumulative.
+					loadMappingId(0);
+					firstMappingPairInSession = 0;
+				}
+
 				mapper_change_mapping_entry(current_mapping, input, output);
 				blips(1);
 				break;
@@ -739,6 +749,7 @@ wait_for_controller:
 	gcpad->buildReport(gc_report);
 
 	// Learn the joystick origin to use
+	_delay_ms(16);
 	setOriginsFromReport(gc_report);
 
 	gc_report_to_mapping(gc_report, g_gamecube_status);
