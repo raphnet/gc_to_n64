@@ -6,6 +6,9 @@ See gpl.txt for details.
 
 -= Relase history =-
 
+April 27, 2013 : Version 1.3.2
+    - Fix an ED64 menu "freeze" bug
+
 April 27, 2013 : Version 1.3.1
     - Fixed a bug when mapping the main joystick to buttons. 
 	  The up[18]/down[19] and left[20]/right[21] directions were inverted.
