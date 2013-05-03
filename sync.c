@@ -72,13 +72,16 @@
 #define MIN_IDLE					1000 // Lowered to work with GC/N64 to USB v2.2
 
 #define DEFAULT_THRESHOLD			1750	// approx 7ms at /64 prescaler
+#define IMMEDIATE_THRESHOLD			1
+
+#define BURST_LIMIT					8
 
 #define STATE_WAIT_THRES			0
 #define STATE_THRESHOLD_REACHED		1
 
 static unsigned int poll_threshold;
 static unsigned char state;
-
+static unsigned char burst_count;
 
 void sync_init(void)
 {
@@ -124,6 +127,21 @@ void sync_master_polled_us(void)
 		
 			if (poll_threshold < MIN_IDLE) {
 				poll_threshold = DEFAULT_THRESHOLD;
+			}
+		}
+		else
+		{
+			// When we receive a continuous stream of N64 polls,
+			// detect it and stop trying to sync. Polling
+			// the Gamecube controller immediately after the
+			// N64 poll is a good low latency solution in such cases.
+			//
+			// This should fix the ED64 OS directory viewer with its
+			// 2ms poll rate.
+			burst_count++;
+			if (burst_count > BURST_LIMIT) {
+				poll_threshold = IMMEDIATE_THRESHOLD;
+				burst_count = 0;
 			}
 		}
 #endif
