@@ -74,6 +74,8 @@
 
 #define DEBUG_PORTD_BIT 0x00	/* In PORTD */
 
+#define DEBUG_ON2 	sbi IO_PORTD, DEBUG_PORTD_BIT	; DEBUG
+#define DEBUG_OFF2 	cbi IO_PORTD, DEBUG_PORTD_BIT	; DEBUG
 #if 0
 #define DEBUG_ON 	sbi IO_PORTD, DEBUG_PORTD_BIT	; DEBUG
 #define DEBUG_OFF 	cbi IO_PORTD, DEBUG_PORTD_BIT	; DEBUG
@@ -87,7 +89,14 @@
 
 #define GC_DATA_BIT		0x02	/* in PORTD */
 #define GC_DATA_MASK	0x04	
-#define DATA_FALL_TIMEOUT	0x15
+
+; 0x06 here combined with the fast command selection code
+; yields a response time of 8.4uS. Much better than
+; the 18.80uS from previous releases.
+;
+; 0x0A : 9.8 uS (eventually fails in F-Zero X)
+;
+#define DATA_FALL_TIMEOUT	0x06
 #define DATA_RAISE_TIMEOUT	0x15 
 
 ; Useful
@@ -159,6 +168,7 @@ fell:
 	andi r20, GC_DATA_MASK			; isolate the data bit
 	st z+, r20						; store the value
 
+
 	dec r16							; One less bit available...
 	breq rx_overflow
 
@@ -179,6 +189,8 @@ rx_overflow:
 	rjmp interrupt_done_poll
 
 rx_complete_f:
+;	DEBUG_ON2
+;	DEBUG_OFF2
 rx_complete_h:
 	
 	; r16 counts down from 	N64_RX_BUF_SIZE
@@ -186,12 +198,64 @@ rx_complete_h:
 	ldi r20, N64_RX_BUF_SIZE
 	sub r20, r16   ;  r20 = N64_RX_BUF - r16
 
-	cpi r20, 9
-	breq got_8bit_command
-
 	; Longer commands for rumble or memory card ignored (for now).
-	; fallthrough to interrupt done.
+	; So jump to interrupt_done_poll in that case.
+	cpi r20, 9
+	brne interrupt_done_poll
+
+got_8bit_command:
+
+	; Commands:
+	; 0x00 : Get capability
+	; 0x01 : Get button status
 	
+
+	; repoint Z to origin of reception buffer	
+	ldi	zl, lo8(n64_rx_buf)
+	ldi zh, hi8(n64_rx_buf)
+
+#ifdef SLOW_VERSION
+	; Convert from 8 bytes to one byte, reult in r20
+	rcall rx_buf_to_byte
+
+	tst r20
+	breq cap
+
+	cpi r20, 0x01
+	breq stat
+
+	cpi r20, 0xff
+	breq cap2
+#else
+	; Detect 0xff by looking at the most significant bit
+	ld r20, z
+	tst r20
+	brne cap2
+
+	; Detect 0x00 or 0x01 by looking at the least significant bit
+	ldd r20, z+8
+	tst r20
+	breq cap
+
+	rcall sendStatus
+
+	; Notify the main loop about the poll
+	ldi r20, 1
+	ldi	zl, lo8(n64_got_command)
+	ldi zh, hi8(n64_got_command)
+	st z, r20
+
+	rjmp interrupt_done_poll
+
+#endif
+
+	DEBUG2_ON
+	nop
+	nop
+	DEBUG2_OFF
+	; ignore unknwn
+	rjmp interrupt_done_poll
+
 interrupt_done_poll:
 	pop r23
 	pop r17
@@ -204,39 +268,6 @@ interrupt_done_poll:
 	reti
 
 
-got_8bit_command:
-
-	; Commands:
-	; 0x00 : Get capability
-	; 0x01 : Get button status
-	
-	ldi r20, 1
-	ldi	zl, lo8(n64_got_command)
-	ldi zh, hi8(n64_got_command)
-	st z, r20
-
-	; repoint Z to origin of reception buffer	
-	ldi	zl, lo8(n64_rx_buf)
-	ldi zh, hi8(n64_rx_buf)
-	; Convert from 8 bytes to one byte, reult in r20
-	rcall rx_buf_to_byte
-
-	tst r20
-	breq cap
-
-	cpi r20, 0x01
-	breq stat
-
-	cpi r20, 0xff
-	breq cap2
-
-	DEBUG2_ON
-	nop
-	nop
-	DEBUG2_OFF
-	; ignore unknwn
-	rjmp interrupt_done_poll
-
 cap2:
 	rcall sendCapabilityWord2
 	rjmp interrupt_done_poll
@@ -246,9 +277,9 @@ cap:
 	rjmp interrupt_done_poll
 	
 		
-stat:
-		rcall sendStatus
-	rjmp interrupt_done_poll
+;stat:
+;		rcall sendStatus
+;	rjmp interrupt_done_poll
 
 	/*********************** DELAY *************/
 align_delay:
