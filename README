@@ -6,6 +6,10 @@ See gpl.txt for details.
 
 -= Relase history =-
 
+May 5, 2013 : Version 1.4
+    - Tighter timing in the N64 interrupt handler. The adapter now
+	  starts answering withing 7.7us. This appears to fix F-Zero X.
+
 April 27, 2013 : Version 1.3.2
     - Fix an ED64 menu "freeze" bug
 
