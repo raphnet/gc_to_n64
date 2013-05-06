@@ -233,7 +233,7 @@ got_8bit_command:
 	brne cap2
 
 	; Detect 0x00 or 0x01 by looking at the least significant bit
-	ldd r20, z+8
+	ldd r20, z+7
 	tst r20
 	breq cap
 
