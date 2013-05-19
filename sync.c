@@ -128,6 +128,13 @@ void sync_master_polled_us(void)
 			if (poll_threshold < MIN_IDLE) {
 				poll_threshold = DEFAULT_THRESHOLD;
 			}
+			
+			burst_count = 0;
+	
+			/* Reset counter */
+			TCNT1 = 0;
+			TIFR |= (1<<TOV1); // clear overflow
+			state = STATE_WAIT_THRES;
 		}
 		else
 		{
@@ -140,8 +147,11 @@ void sync_master_polled_us(void)
 			// 2ms poll rate.
 			burst_count++;
 			if (burst_count > BURST_LIMIT) {
+				TCNT1 = 0;
+				TIFR |= (1<<TOV1); // clear overflow
 				poll_threshold = IMMEDIATE_THRESHOLD;
 				burst_count = 0;
+				state = STATE_WAIT_THRES;
 			}
 		}
 #endif

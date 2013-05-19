@@ -99,6 +99,8 @@
 #define DATA_FALL_TIMEOUT	0x06
 #define DATA_RAISE_TIMEOUT	0x15 
 
+#define CMD_9BIT_HACK
+
 ; Useful
 #define xl	r26
 #define xh	r27
@@ -120,7 +122,11 @@ SIG_INTERRUPT0:
 	push r23
 	ldi	zl, lo8(n64_rx_buf)
 	ldi zh, hi8(n64_rx_buf)
+#ifdef CMD_9BIT_HACK
+	ldi r16, 9	; HACK : Stop after the 9th bit
+#else
 	ldi r16, N64_RX_BUF_SIZE				; We can accept up to 32 bits
+#endif
 	rjmp fell
 
 
@@ -186,6 +192,7 @@ waitHigh:
 	
 rx_overflow:
 
+#ifndef CMD_9BIT_HACK
 	rjmp interrupt_done_poll
 
 rx_complete_f:
@@ -202,6 +209,11 @@ rx_complete_h:
 	; So jump to interrupt_done_poll in that case.
 	cpi r20, 9
 	brne interrupt_done_poll
+#else
+
+rx_complete_f:
+rx_complete_h:
+#endif
 
 got_8bit_command:
 
@@ -227,6 +239,7 @@ got_8bit_command:
 	cpi r20, 0xff
 	breq cap2
 #else
+#if 1
 	; Detect 0xff by looking at the most significant bit
 	ld r20, z
 	tst r20
@@ -236,16 +249,10 @@ got_8bit_command:
 	ldd r20, z+7
 	tst r20
 	breq cap
-
+#endif
 	rcall sendStatus
 
-	; Notify the main loop about the poll
-	ldi r20, 1
-	ldi	zl, lo8(n64_got_command)
-	ldi zh, hi8(n64_got_command)
-	st z, r20
-
-	rjmp interrupt_done_poll
+		rjmp interrupt_done_poll
 
 #endif
 
@@ -257,6 +264,15 @@ got_8bit_command:
 	rjmp interrupt_done_poll
 
 interrupt_done_poll:
+
+; Notify the main loop about the poll
+	ldi r20, 1
+	ldi	zl, lo8(n64_got_command)
+	ldi zh, hi8(n64_got_command)
+	st z, r20
+
+
+
 	pop r23
 	pop r17
 	pop r16	
@@ -472,7 +488,7 @@ lp_sendGCData_bits:
 send0:
 	sbi IO_DDRD, GC_DATA_BIT	; Pull bus to 0 
 	
-	ldi r20, 15
+	ldi r20, 20
 lp_send0_3us:
 	dec r20
 	brne lp_send0_3us
@@ -480,7 +496,7 @@ lp_send0_3us:
 
 	cbi IO_DDRD, GC_DATA_BIT	; Release bus to 1
 
-	ldi r20, 2
+	ldi r20, 4
 lp_send0_1us:
 	dec r20
 	brne lp_send0_1us
@@ -496,7 +512,7 @@ lp_send0_1us:
 	nop
 	; STOP BIT
 	sbi IO_DDRD, GC_DATA_BIT ; Pull low for stop bit
-	ldi r20, 4
+	ldi r20, 8
 stbdly0:
 	dec r20
 	brne stbdly0
@@ -511,7 +527,7 @@ stbdly0:
 send1:
 	sbi IO_DDRD, GC_DATA_BIT	; Pull bus to 0
 
-	ldi r20, 4
+	ldi r20, 6
 lp_send1_1us:
 	dec r20
 	brne lp_send1_1us
@@ -520,7 +536,7 @@ lp_send1_1us:
 	
 	cbi IO_DDRD, GC_DATA_BIT	; Release bus to 1
 
-	ldi r20, 12
+	ldi r20, 18
 lp_send1_3us:
 	dec r20
 	brne lp_send1_3us
