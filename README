@@ -8,10 +8,14 @@ See gpl.txt for details.
 
 May 5, 2013 : Version 1.4
     - Tighter timing in the N64 interrupt handler. The adapter now
-	  starts answering withing 7.7us. This appears to fix F-Zero X.
-
-April 27, 2013 : Version 1.3.2
+	  starts answering much faster. This appears to fix F-Zero X.
+	  (Never seen a game picky and *buggy like that)
+	  * Disconnect even a standard controller and say goodbye
+	  to your race. Connecting the controller back does not work. Right,
+	  no reason to do that. But if the controller fails to answer only
+	  one poll request, it's game over...
     - Fix an ED64 menu "freeze" bug
+	- Improve the Wavebird neutral position
 
 April 27, 2013 : Version 1.3.1
     - Fixed a bug when mapping the main joystick to buttons. 

@@ -175,6 +175,14 @@ static char gamecubeUpdate(char origin)
 	// 30 : works
 	_delay_us(50);
 
+	// 2013-05-19 RA: 
+	//
+	// I discovered that in the goldeneye menu, the crosshair moves down 
+	// very slowly when the controller is idle. This means that making
+	// the zero with the 0x420302 does not work properly. Revert
+	// to using the first value returned by GETSTATUS.
+	origin = 0; 
+
 	if (origin)	{
 		// Ok... at first I was trying a so-called 'get origin command' (0x41) to work,
 		// but it did nothing on the wavebird. But this command seems to work. The document
