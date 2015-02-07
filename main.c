@@ -125,6 +125,12 @@ void toggleDeadzone(void)
 	eeprom_commit();
 }
 
+void setDefaultMapping(int id)
+{
+	g_eeprom_data.defmap = id;
+	eeprom_commit();
+}
+
 #define EV_BTN_A		0x001
 #define EV_BTN_B		0x002
 #define EV_BTN_X		0x004
@@ -294,6 +300,43 @@ first_ev:
 	return 0;
 }
 
+int set_default_menu()
+{
+	int ev;
+
+	blips(1);
+	ev = getEvent();
+
+	switch(ev)
+	{
+		case EV_BTN_D_UP:
+			setDefaultMapping(1);
+			return 0;
+
+		case EV_BTN_D_DOWN:
+			setDefaultMapping(2);
+			return 0;
+
+		case EV_BTN_D_LEFT:
+			setDefaultMapping(3);
+			return 0;
+
+		case EV_BTN_D_RIGHT:
+			setDefaultMapping(4);
+			return 0;
+
+		case EV_BTN_START:
+			setDefaultMapping(0);
+			return 0;
+
+		default:
+			return -1;
+	}
+
+	return 0;
+
+}
+
 // R pressed. Next steps:
 //
 // Dpad direction : Save to corresponding slots and exit.
@@ -331,6 +374,9 @@ int rmenu_do()
 		case EV_BTN_Z:
 			toggleDeadzone();
 			break;
+
+		case EV_BTN_L:
+			return set_default_menu();
 
 		default:
 			return -1;
@@ -679,7 +725,7 @@ void n64_status_to_output(struct mapping_controller_unit *n64s, unsigned char vo
 int main(void)
 {
 	char res, read_fail_count = 0;
-	
+
 	gcpad = gamecubeGetGamepad();
 
 
@@ -709,12 +755,11 @@ int main(void)
 	n64_tx_id_reply[1] = 0x00;
 	n64_tx_id_reply[2] = 0x02;
 
-	// Got command 0xff with mario 64, controller replies similarly	
+	// Got command 0xff with mario 64, controller replies similarly
 	n64_tx_id2_reply[0] = 0x05;
-	n64_tx_id2_reply[1] = 0x00; 
+	n64_tx_id2_reply[1] = 0x00;
 	n64_tx_id2_reply[2] = 0x00;
-	
-	sei();
+
 
 	buzzer_init();
 	blips(1);
@@ -727,9 +772,10 @@ int main(void)
 		blips(2);
 	}
 
-	loadMappingId(g_eeprom_data.defmap);	
+	sei();
 
-	
+	loadMappingId(g_eeprom_data.defmap);
+
 	timerStart();
 
 	gcpad->init();

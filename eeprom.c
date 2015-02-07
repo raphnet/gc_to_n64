@@ -1,5 +1,5 @@
 /*  GC to N64 : Gamecube controller to N64 adapter firmware
-    Copyright (C) 2011  Raphael Assenat <raph@raphnet.net>
+    Copyright (C) 2011-2015  Raphael Assenat <raph@raphnet.net>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -27,7 +27,7 @@ void eeprom_commit(void)
 
 int eeprom_init(void)
 {
-	char *magic = "GC2N64v5";
+	char *magic = "GC2N64v6";
 	eeprom_read_block(&g_eeprom_data, (void*)0x00, sizeof(struct eeprom_data_struct));
 
 	/* Check for magic number */

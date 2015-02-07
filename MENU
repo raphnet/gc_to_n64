@@ -1,0 +1,29 @@
+--- DEFAULT MODE ---
+
+Hold start for ~8 seconds : Enters mapping mode
+
+--- Mapping management mode ---
+
+1) DPAD(any direction) -> Load mapping and exit
+
+2) R -> Enters the R menu
+
+3) START -> Exit
+
+4) ZABXYL -> Code entry...
+
+
+--- R menu ---
+
+1) DPAD(any direction) -> Save mapping and exit
+
+2) Z -> Toggle dead zone, save and exit
+
+3) START -> Load default (standard) mapping and exit
+
+4) L followed by DPAD (any direction) -> Make saved mapping defaut
+
+5) L followed by START -> Make default (standard) mapping active
+
+
+
