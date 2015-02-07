@@ -26,18 +26,11 @@ gc_to_n64.hex: gc_to_n64.elf
 	avr-size gc_to_n64.elf
 
 fuse:
-	$(UISP) --wr_fuse_h=0xd9 --wr_fuse_l=0xdf --wr_fuse_e=0xf
+	$(AVRDUDE) -p $(AVRDUDE_CPU) -P usb -c avrispmkII -Uhfuse:w:0xd9:m -Ulfuse:w:0xdf:m -B 20.0 -F
 
 flash: $(HEXFILE)
-	$(UISP) --erase --upload --verify if=$(HEXFILE)
+	$(AVRDUDE) -p $(AVRDUDE_CPU) -P usb -c avrispmkII -Uflash:w:$(HEXFILE) -B 1.0 -F
 
-fuse_usb:
-	#sudo $(AVRDUDE) -p $(AVRDUDE_CPU) -P usb -c avrispmkII -Uefuse:w:0x07:m -Uhfuse:w:0xd9:m -Ulfuse:w:0xdf:m -B 20.0 -F
-	sudo $(AVRDUDE) -p $(AVRDUDE_CPU) -P usb -c avrispmkII -Uhfuse:w:0xd9:m -Ulfuse:w:0xdf:m -B 20.0 -F
-
-flash_usb: $(HEXFILE)
-	sudo $(AVRDUDE) -p $(AVRDUDE_CPU) -P usb -c avrispmkII -Uflash:w:$(HEXFILE) -B 1.0 -F
-	
 %.o: %.c
 	$(CC) $(CFLAGS) -c $<
 
