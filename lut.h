@@ -3,6 +3,6 @@
 
 #include <avr/pgmspace.h>
 
-extern unsigned char correction_lut[] PROGMEM;
+extern const unsigned char correction_lut[] PROGMEM;
 
 #endif

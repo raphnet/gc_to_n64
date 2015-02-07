@@ -1,7 +1,7 @@
 ;
 ;	n64_to_wii: AVR Microcontroller firmware for converting N64 controller
 ;	          protocol to Nintendo Wii/Gamecube controller protocol.
-;    Copyright (C) 2007-2008  Raphael Assenat <raph@raphnet.net>
+;    Copyright (C) 2007-2015  Raphael Assenat <raph@raphnet.net>
 ;
 ;    This program is free software; you can redistribute it and/or modify
 ;    it under the terms of the GNU General Public License as published by
@@ -17,7 +17,9 @@
 ;    with this program; if not, write to the Free Software Foundation, Inc.,
 ;    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 ;
-;	------------------------------------------------------------------------   
+;	------------------------------------------------------------------------
+;
+; 2015-02-07: Updated interrupt name for compilation with recent avr-libc
 ;
 
 #include <avr/io.h>
@@ -44,7 +46,7 @@
 .lcomm n64_use_buf1 1;
 
 .text
-.global SIG_INTERRUPT0
+.global INT0_vect
 .global n64_rx_buf
 .global n64_tx_buf0
 .global n64_tx_buf1
@@ -111,7 +113,7 @@
 
 
 
-SIG_INTERRUPT0:
+INT0_vect:
 	push r1	
 	in r1, IO_SREG
 	push zl
