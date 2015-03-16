@@ -6,6 +6,10 @@ See gpl.txt for details.
 
 -= Relase history =-
 
+March 15, 2015 : Version 1.5.1
+    - New fuse values to enable brown out detector. Fixes
+	  the issue of random loss of mappings.
+
 February 7, 2015 : Version 1.5
     - Add a feature to select the default mapping at startup.
 	- Minor updates for compilation with recent toolchain.
