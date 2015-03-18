@@ -55,6 +55,9 @@ fuse:
 flash: $(HEXFILE)
 	$(AVRDUDE) -p $(AVRDUDE_CPU) -P usb -c avrispmkII -Uflash:w:$(HEXFILE) -B 1.0 -F
 
+reset:
+	$(AVRDUDE) -p $(AVRDUDE_CPU) -P usb -c avrispmkII -B 1.0 -F
+
 %.o: %.c
 	$(CC) $(CFLAGS) -c $<
 
