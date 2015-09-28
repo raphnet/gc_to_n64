@@ -1,10 +1,15 @@
 Gamecube controller to N64 adapter project
 Copyright (C) 2011-2015 Raphael Assenat <raph@raphnet.net>
 
-Source code licensed under the General Public License. 
+Source code licensed under the General Public License.
 See gpl.txt for details.
 
 -= Relase history =-
+
+September 28, 2015 : Version 1.6
+    - N64 interrupt handler stability improvements
+    - Add Atmega168 support
+	- Add visual buzzer (simple LED) support
 
 March 15, 2015 : Version 1.5.1
     - New fuse values to enable brown out detector. Fixes
@@ -26,17 +31,17 @@ May 5, 2013 : Version 1.4
 	- Improve the Wavebird neutral position
 
 April 27, 2013 : Version 1.3.1
-    - Fixed a bug when mapping the main joystick to buttons. 
+    - Fixed a bug when mapping the main joystick to buttons.
 	  The up[18]/down[19] and left[20]/right[21] directions were inverted.
     - Fixed a bug when entering a new mapping code where the unchanged
  	  parts of the previously active mapping remained in effect.
 
-March 2, 2013 : Version 1.3 
-    - Added a joystick deadzone feature (default OFF). To enable, 
-	or disable if previously enabled, hold START until your hear the 5 
-	beeps, fully press and release R, the press Z. Wait a few moments 
+March 2, 2013 : Version 1.3
+    - Added a joystick deadzone feature (default OFF). To enable,
+	or disable if previously enabled, hold START until your hear the 5
+	beeps, fully press and release R, the press Z. Wait a few moments
 	for the final beeps. The setting is stored in the adapter, no need
-	 to repeat after each power up. 
+	 to repeat after each power up.
 
 February 12, 2013 : Version 1.2.2 - Bug fixes and minor features
     - The analog L and R sliders are now unmapped by default.
@@ -63,7 +68,7 @@ January 25, 2011 : Version 1.1. Compatiblity fixes:
 	  centered.
 
 	- Better conversion from Gamecube axis values to N64 values. This
-	  fixes issues with some game/controllers where, for instance, 
+	  fixes issues with some game/controllers where, for instance,
 	  the character would not run at full speed.
 
 	Note: The maximum axis values and corner angles closely approximates
@@ -74,11 +79,11 @@ August 10, 2011 : Version 1.0. Initial relase.
 
 -= Project summary =-
 
-A common problem with the N64 controllers is the joystick. It wears down and 
-become unusable. However Gamecube controllers don't seem to wear down much 
+A common problem with the N64 controllers is the joystick. It wears down and
+become unusable. However Gamecube controllers don't seem to wear down much
 and are quite similar to the N64 controllers.
 
-So I've been asked many times if I could design an adapter for using Gamecube 
+So I've been asked many times if I could design an adapter for using Gamecube
 controllers on a N64 system. This project is the result.
 
 For the latest source code, builds, schematic and instructions:
