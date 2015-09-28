@@ -278,7 +278,7 @@ interrupt_done_poll:
 
 #ifndef AT168_COMPATIBLE
 	ldi r20, 0x40 ; INTF0
-	out GIFR, r20
+	sts GIFR, r20
 #else
 	sbi IO_EIFR, 0 ; Clear INTF0
 #endif
