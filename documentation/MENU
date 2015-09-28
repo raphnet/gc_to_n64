@@ -21,9 +21,9 @@ Hold start for ~8 seconds : Enters mapping mode
 
 3) START -> Load default (standard) mapping and exit
 
-4) L followed by DPAD (any direction) -> Make saved mapping defaut
+4) L followed by DPAD (any direction) -> Make saved mapping active by defaut
 
-5) L followed by START -> Make default (standard) mapping active
+5) L followed by START -> Make the built-in (standard) mapping active by default
 
 6) B -> Toggle v1.5 stick conversion, save and exit
 
