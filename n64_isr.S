@@ -25,6 +25,7 @@
 #include <avr/io.h>
 
 #include "n64_isr.h"
+#include "compat.h"
 
 #define R7_BIT_UNSWAP_L_Z	0
 #define R7_BIT_SIN			1
@@ -67,8 +68,7 @@
 #define IO_PORTB _SFR_IO_ADDR(PORTB)
 #define IO_DDRB _SFR_IO_ADDR(DDRB)
 #define IO_PINB	_SFR_IO_ADDR(PINB)
-#define IO_MCUCR _SFR_IO_ADDR(MCUCR)
-#define IO_GICR	_SFR_IO_ADDR(GICR)
+#define IO_EIFR	_SFR_IO_ADDR(EIFR)
 
 #define CLK_H_LATCH_H	0x30
 #define CLK_H_LATCH_L	0x20
@@ -76,18 +76,22 @@
 
 #define DEBUG_PORTD_BIT 0x00	/* In PORTD */
 
+#if 0
 #define DEBUG_ON2 	sbi IO_PORTD, DEBUG_PORTD_BIT	; DEBUG
 #define DEBUG_OFF2 	cbi IO_PORTD, DEBUG_PORTD_BIT	; DEBUG
-#if 0
 #define DEBUG_ON 	sbi IO_PORTD, DEBUG_PORTD_BIT	; DEBUG
 #define DEBUG_OFF 	cbi IO_PORTD, DEBUG_PORTD_BIT	; DEBUG
-#else
-#define DEBUG_ON	nop
-#define DEBUG_OFF	nop
-#endif
-
 #define DEBUG2_ON 	sbi IO_PORTD, DEBUG_PORTD_BIT	; DEBUG
 #define DEBUG2_OFF 	cbi IO_PORTD, DEBUG_PORTD_BIT	; DEBUG
+#else
+#define DEBUG_ON2	nop
+#define DEBUG_OFF2	nop
+#define DEBUG_ON	nop
+#define DEBUG_OFF	nop
+#define DEBUG2_ON	nop
+#define DEBUG2_OFF	nop
+#endif
+
 
 #define GC_DATA_BIT		0x02	/* in PORTD */
 #define GC_DATA_MASK	0x04	
@@ -232,7 +236,7 @@ got_8bit_command:
 	; Convert from 8 bytes to one byte, reult in r20
 	rcall rx_buf_to_byte
 
-	tst r20
+	tst r20	; 0x00
 	breq cap
 
 	cpi r20, 0x01
@@ -241,7 +245,6 @@ got_8bit_command:
 	cpi r20, 0xff
 	breq cap2
 #else
-#if 1
 	; Detect 0xff by looking at the most significant bit
 	ld r20, z
 	tst r20
@@ -251,7 +254,7 @@ got_8bit_command:
 	ldd r20, z+7
 	tst r20
 	breq cap
-#endif
+
 	rcall sendStatus
 
 		rjmp interrupt_done_poll
@@ -273,7 +276,12 @@ interrupt_done_poll:
 	ldi zh, hi8(n64_got_command)
 	st z, r20
 
-
+#ifndef AT168_COMPATIBLE
+	ldi r20, 0x40 ; INTF0
+	out GIFR, r20
+#else
+	sbi IO_EIFR, 0 ; Clear INTF0
+#endif
 
 	pop r23
 	pop r17
@@ -283,18 +291,19 @@ interrupt_done_poll:
 	pop zl
 	out IO_SREG, r1
 	pop r1
+
 	reti
 
 
 cap2:
 	rcall sendCapabilityWord2
 	rjmp interrupt_done_poll
-	
+
 cap:
 	rcall sendCapabilityWord
 	rjmp interrupt_done_poll
-	
-		
+
+
 ;stat:
 ;		rcall sendStatus
 ;	rjmp interrupt_done_poll
@@ -363,10 +372,9 @@ nbrrr:
 	brne nbrrr
 
 	pop r17
-	pop r16	
+	pop r16
 	ret
-	
-	
+
 
 sendCapabilityWord:
 	push xl
@@ -438,7 +446,7 @@ sendStatus:
 	rjmp bufferSelected
 useBuf1:
 	ldi	zl, lo8(n64_tx_buf1)
-	ldi zh, hi8(n64_tx_buf1)	
+	ldi zh, hi8(n64_tx_buf1)
 
 bufferSelected:
 	; Send the packet
@@ -458,9 +466,9 @@ dosendGCData:
 	*  3us 1us    1us 3us
 	*
 	* To send a 1, the pin direction is set to input.
-	* To send a 0, the pin direction is set to output. 
+	* To send a 0, the pin direction is set to output.
 	*	(of course, it's value is preset to zero)
-	* 
+	*
 	* At 16 mhz, a 1us period is 16 cycles. Thus a 3us period
 	* is 48 cycles.
 	*
@@ -488,8 +496,8 @@ lp_sendGCData_bits:
 	brne send1
 	nop
 send0:
-	sbi IO_DDRD, GC_DATA_BIT	; Pull bus to 0 
-	
+	sbi IO_DDRD, GC_DATA_BIT	; Pull bus to 0
+
 	ldi r20, 20
 lp_send0_3us:
 	dec r20
@@ -535,7 +543,7 @@ lp_send1_1us:
 	brne lp_send1_1us
 	nop
 	nop
-	
+
 	cbi IO_DDRD, GC_DATA_BIT	; Release bus to 1
 
 	ldi r20, 18
@@ -563,10 +571,26 @@ stbdly1:
 	brne stbdly1
 	nop
 	cbi IO_DDRD, GC_DATA_BIT	; Release
-	
+
+waithigh:
+	ldi r20, 0xff
+waithigh_lp:
+	dec r20
+	breq waithigh_done
+
+	sbic IO_PIND, GC_DATA_BIT
+	rjmp waithigh_done
+	nop
+	nop
+	nop
+	nop
+	rjmp waithigh_lp
+
+waithigh_done:
+
 	pop r23
 	pop r20
 	pop r19
-	
+
 	ret
 
