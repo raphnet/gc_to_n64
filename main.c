@@ -36,7 +36,7 @@
 #include "mapper.h"
 #include "gamecube_mapping.h"
 #include "n64_mapping.h"
-
+#include "compat.h"
 #include "eeprom.h"
 
 /* After this many read failures in a row, consider the controller
@@ -46,6 +46,7 @@
 
 #define DEBUG_LOW()		do { PORTD &= ~(1); } while(0)
 #define DEBUG_HIGH()	do { PORTD |= 1; } while(0)
+
 
 Gamepad *gcpad;
 unsigned char gc_report[GC_REPORT_SIZE];
@@ -742,11 +743,16 @@ int main(void)
 	DDRC=0;
 	PORTC=0xff;
 
+#ifdef AT168_COMPATIBLE
+	EICRA = 0x02;
+	EIMSK = 0x01;
+#else
 	// configure external interrupt 1 to trigger on falling edge.
 	MCUCR |= 1<<ISC11;
 	MCUCR &= ~(1<<ISC10);
 
 	GICR |= (1<<INT0);
+#endif
 
 	memset((void*)n64_tx_buf0, 0, sizeof(n64_tx_buf0));
 	memset((void*)n64_tx_buf1, 0, sizeof(n64_tx_buf1));
@@ -771,6 +777,7 @@ int main(void)
 		 * silent, unless the eeprom got corrupted. */
 		blips(2);
 	}
+
 
 	sei();
 
