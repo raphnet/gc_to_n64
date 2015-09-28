@@ -15,6 +15,11 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 #include <avr/io.h>
+#include "compat.h"
+
+#ifdef AT168_COMPATIBLE
+#define TIFR TIFR0
+#endif
 
 /* Forces the old behaviour which means a stable time distance 
  * between N64 poll and our Gamecube * poll. Sometimes useful

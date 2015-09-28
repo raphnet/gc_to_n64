@@ -16,6 +16,11 @@
 */
 #include <avr/io.h>
 #include <avr/interrupt.h>
+#include "compat.h"
+
+#ifdef AT168_COMPATIBLE
+#define TIMSK	TIMSK0
+#endif
 
 static unsigned char t0_count;
 
@@ -33,15 +38,21 @@ void timerIntOff()
 void timerIntOn()
 {
 	TIMSK |= 1<<TOIE0;
+	TIMSK0 |= 1<<TOIE0; // enable overflow int
 }
 
 void timerStart()
 {
+#ifdef AT168_COMPATIBLE
+	TCCR0A = 0; // Normal port operation
+	TCCR0B = 1<<CS02 | 1<<CS00; // /1024 prescaler
+	TIMSK0 = 1<<TOIE0; // enable overflow int
+#else
 	// 1024 prescaler
 	TCCR0 = 1<<CS02 | 1<<CS00;
 	TCNT0 = 0;
 	TIMSK |= 1<<TOIE0;
-
+#endif
 	// 16000000 / 1024 / 256 = approx 61hz
 	t0_count = 0;
 }
