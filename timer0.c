@@ -38,7 +38,6 @@ void timerIntOff()
 void timerIntOn()
 {
 	TIMSK |= 1<<TOIE0;
-	TIMSK0 |= 1<<TOIE0; // enable overflow int
 }
 
 void timerStart()
