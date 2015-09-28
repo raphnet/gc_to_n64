@@ -42,7 +42,6 @@
 .lcomm n64_tx_buf0, N64_TX_BUF_SIZE	; reply is 32 bits + 1 stop bit
 .lcomm n64_tx_buf1, N64_TX_BUF_SIZE	;
 .lcomm n64_tx_id_reply 3;
-.lcomm n64_tx_id2_reply 3;
 .lcomm n64_got_command 1;
 .lcomm n64_use_buf1 1;
 
@@ -296,9 +295,6 @@ interrupt_done_poll:
 
 
 cap2:
-	rcall sendCapabilityWord2
-	rjmp interrupt_done_poll
-
 cap:
 	rcall sendCapabilityWord
 	rjmp interrupt_done_poll
@@ -400,34 +396,6 @@ sendCapabilityWord:
 	ldi r23, 24
 	rcall sendGCData
 	ret
-
-sendCapabilityWord2:
-	push xl
-	push xh
-
-	ldi xl, lo8(n64_tx_id2_reply)
-	ldi xh, hi8(n64_tx_id2_reply)
-	ldi zl, lo8(n64_rx_buf)
-	ldi zh, hi8(n64_rx_buf)
-
-	ld r20, x+
-	rcall byte_to_rxbuf
-	ld r20, x+
-	rcall byte_to_rxbuf
-	ld r20, x+
-	rcall byte_to_rxbuf
-
-	pop xh
-	pop xl
-
-
-
-	ldi zl, lo8(n64_rx_buf)
-	ldi zh, hi8(n64_rx_buf)
-	ldi r23, 24
-	rcall sendGCData
-	ret
-
 
 	/******************************************
 	Load the latest buffer address in Z and
