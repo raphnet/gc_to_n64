@@ -14,12 +14,8 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-
-
 #include <avr/io.h>
-
 #include <util/delay.h>
-
 #include "buzzer.h"
 
 
@@ -44,8 +40,9 @@ void blips(int n)
 
 void buzz(int on)
 {
+#ifndef VISUAL_BUZZER
 	unsigned short intensity = 0x1F;
-	
+
 	if (on==0) {
 		TCCR1A = 0;
 		return;
@@ -57,4 +54,11 @@ void buzz(int on)
 
 	OCR1AH = intensity >> 8;
 	OCR1AL = intensity & 0xff;
+#else
+	if (on) {
+		PORTB |= 1<<PB1;
+	} else {
+		PORTB &= ~(1<<PB1);
+	}
+#endif
 }
