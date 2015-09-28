@@ -269,7 +269,7 @@ first_ev:
 				target = output;
 				value = 0x80;
 				break;
-	
+
 			case EV_BTN_A:
 				value *= CODE_BASE;
 				break;
@@ -407,8 +407,12 @@ void menumain()
 
 	// re-init buzzer (sync uses the same timer)
 	buzzer_init();
-
+#ifndef VISUAL_BUZZER
 	blips(5);
+#else
+	buzzer_led_invert(1);
+	buzz(0);
+#endif
 
 	waitStartRelease();
 
@@ -487,11 +491,7 @@ void menumain()
 	}
 
 error:
-	blips(3);
-
-	buzz(1);
-	_delay_ms(700);
-	buzz(0);
+	buzz_error();
 
 	// re-init sync. Buzzer uses the same timer...
 	sync_init();
@@ -500,6 +500,7 @@ error:
 	return;
 
 menu_done:
+	buzzer_led_invert(0);
 	blips(3);
 
 	// re-init sync. Buzzer uses the same timer...
@@ -789,12 +790,6 @@ int main(void)
 	n64_tx_id_reply[0] = 0x05;
 	n64_tx_id_reply[1] = 0x00;
 	n64_tx_id_reply[2] = 0x02;
-
-	// Got command 0xff with mario 64, controller replies similarly
-	n64_tx_id2_reply[0] = 0x05;
-	n64_tx_id2_reply[1] = 0x00;
-	n64_tx_id2_reply[2] = 0x00;
-
 
 	buzzer_init();
 	blips(1);

@@ -18,23 +18,51 @@
 #include <util/delay.h>
 #include "buzzer.h"
 
+static char invert_mode = 0;
+
+void buzzer_led_invert(char invert)
+{
+	invert_mode = invert;
+}
 
 void buzzer_init(void)
 {
 	// Active-high output for buzzer on PB1 (OC1A)
 	PORTB &= ~(1<<PB1);	
 	DDRB |= 1<<PB1;
-	
-
 }
+
+void buzz_error(void)
+{
+#ifdef VISUAL_BUZZER
+	blips(10);
+	buzzer_led_invert(0);
+	buzz(0);
+#else
+	// did did did dah----
+	blips(3);
+
+	buzz(1);
+	_delay_ms(700);
+	buzz(0);
+#endif
+}
+
+#ifdef VISUAL_BUZZER
+#define ON_DELAY	80
+#define OFF_DELAY	80
+#else
+#define ON_DELAY	120
+#define OFF_DELAY	50
+#endif
 
 void blips(int n)
 {
 	do {
 		buzz(1);
-		_delay_ms(120);
+		_delay_ms(ON_DELAY);
 		buzz(0);
-		_delay_ms(50);
+		_delay_ms(OFF_DELAY);
 	} while (--n);
 }
 
@@ -55,6 +83,9 @@ void buzz(int on)
 	OCR1AH = intensity >> 8;
 	OCR1AL = intensity & 0xff;
 #else
+	if (invert_mode) {
+		on = !on;
+	}
 	if (on) {
 		PORTB |= 1<<PB1;
 	} else {
