@@ -120,6 +120,12 @@ int loadMappingId(int id)
 	return 0;
 }
 
+void toggle_old_v1_5_conversion(void)
+{
+	g_eeprom_data.old_v1_5_conversion = !g_eeprom_data.old_v1_5_conversion;
+	eeprom_commit();
+}
+
 void toggleDeadzone(void)
 {
 	g_eeprom_data.deadzone_enabled = !g_eeprom_data.deadzone_enabled;
@@ -379,6 +385,10 @@ int rmenu_do()
 		case EV_BTN_L:
 			return set_default_menu();
 
+		case EV_BTN_B:
+			toggle_old_v1_5_conversion();
+			break;
+
 		default:
 			return -1;
 	}
@@ -539,18 +549,25 @@ static void setOriginsFromReport(const unsigned char gcr[GC_REPORT_SIZE])
 	gc_y_origin = gcr[1]^0x80;
 }
 
-/* 
+/*
  * \return N64 axis data (unsigned)
  * */
 static int calb(char orig, unsigned char val)
 {
 	short tmp;
-	long mult = 25000;
+	long mult = 26000; // V1.6
 	char dz=0;
+
+	if (g_eeprom_data.old_v1_5_conversion) {
+		mult = 25000;
+	}
 
 	if (g_eeprom_data.deadzone_enabled) {
 		dz = 12;
-		mult = 29000;
+		mult = 30000; // V1.6
+		if (g_eeprom_data.old_v1_5_conversion) {
+			mult = 29000;
+		}
 	}
 
 	tmp = (signed char)(val^0x80) - orig;
@@ -602,9 +619,19 @@ static void gamecubeXYtoN64(unsigned char x, unsigned char y, char *dst_x, char 
 	unsigned char abs_y, abs_x;
 	long sig_x, sig_y;
 	long sx, sy;
-	//long l = 1700; // THe lower, the stronger the correction. 32768 means null correction
-	//long l = 16000; // THe lower, the stronger the correction. 32768 means null correction
-	long l = 512; // THe lower, the stronger the correction. 32768 means null correction
+	int n64_maxval = 80; // Version 1.6
+
+	// The lower, the stronger the correction. 32768 means null correction
+	//long l = 1700;
+	//long l = 16000;
+	long l = 256; // Version 1.6
+
+	if (g_eeprom_data.old_v1_5_conversion) {
+		// Provide a way to use the old parameters, in case
+		// it turns out the new values are not good.
+		l = 512;
+		n64_maxval = 127;
+	}
 
 	sig_x = calb(gc_x_origin, x);
 	sig_y = calb(gc_y_origin, y);
@@ -616,18 +643,20 @@ static void gamecubeXYtoN64(unsigned char x, unsigned char y, char *dst_x, char 
 		sx = sig_x + sig_x * abs_y / l;
 		sy = sig_y + sig_y * abs_x / l;
 	} else {
+		// Direct conversion (for testing. Not good for use, corners do not
+		// reach maximum values)
 		sx = sig_x;
 		sy = sig_y;
 	}
 
-	if (sx<=-127)
-		sx = -127;
-	if (sx>127)
-		sx = 127;
-	if (sy<=-127)
-		sy = -127;
-	if (sy>127)
-		sy = 127;
+	if (sx<=-n64_maxval)
+		sx = -n64_maxval;
+	if (sx>n64_maxval)
+		sx = n64_maxval;
+	if (sy<=-n64_maxval)
+		sy = -n64_maxval;
+	if (sy>n64_maxval)
+		sy = n64_maxval;
 
 	*dst_x = sx;
 	*dst_y = sy;

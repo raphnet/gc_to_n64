@@ -12,6 +12,7 @@ struct eeprom_data_struct {
 	unsigned char magic[EEPROM_MAGIC_SIZE];
 	unsigned char defmap;
 	unsigned char deadzone_enabled;
+	unsigned char old_v1_5_conversion;
 	unsigned char appdata[EEPROM_APPDATA_SIZE];
 };
 
