@@ -21,12 +21,12 @@
 #define TIFR TIFR0
 #endif
 
-/* Forces the old behaviour which means a stable time distance 
+/* Forces the old behaviour which means a stable time distance
  * between N64 poll and our Gamecube * poll. Sometimes useful
  * when debugging with an oscilloscope. */
 //#define OLD_MODE
 
-/* 
+/*
  * - Introduction
  *
  * The most simple approach for such an adapter is to wait
@@ -38,23 +38,23 @@
  * Albeit simple, this approach has a serious drawback. It answers
  * the N64 polls with OLD data. How old? This depends on the game.
  * If the game polls the controller every frame, the data will
- * be approximately 15ms old. 
+ * be approximately 15ms old.
  *
- * 15ms might not be a lot, and in many games our brain can 
- * anticipate and we can get used to it. But in games with 
+ * 15ms might not be a lot, and in many games our brain can
+ * anticipate and we can get used to it. But in games with
  * lower poll rates such as Mario Kart (approx. every 35ms), the
  * delay becomes serious.
  *
- * But be it 15ms or 35ms, any delay is highly undesirable for games 
+ * But be it 15ms or 35ms, any delay is highly undesirable for games
  * which requires a very quick reponse from the player. And otherwise,
  * let's not forget that small delays can accumulate. We already
- * have so many unwanted delays with LCD TVs, etc... But at least, 
+ * have so many unwanted delays with LCD TVs, etc... But at least,
  * since we can do something about the delay this adapter can cause,
  * let's do it.
  *
  *
  * - Strategy
- * 
+ *
  * Instead of polling right away after being polled by the N64,
  * we wait and poll at the last minute before the N64 polls us.
  * This way, we are able to reply with a controller status as fresh
@@ -67,7 +67,7 @@
  *
  */
 
-/* The time required to poll a gamecube controller is 300uS. 
+/* The time required to poll a gamecube controller is 300uS.
  * The extra 150uS is a safety margin against jitter.
  * */
 #define TIME_TO_POLL				250	// 450uS
@@ -97,7 +97,6 @@ void sync_init(void)
 	/* /64 divisor. Overflows every 262ms */
 	state = STATE_WAIT_THRES;
 	poll_threshold = DEFAULT_THRESHOLD;
-
 }
 
 void sync_master_polled_us(void)
@@ -129,13 +128,13 @@ void sync_master_polled_us(void)
 			} else {
 				poll_threshold = DEFAULT_THRESHOLD;
 			}
-		
+
 			if (poll_threshold < MIN_IDLE) {
 				poll_threshold = DEFAULT_THRESHOLD;
 			}
-			
+
 			burst_count = 0;
-	
+
 			/* Reset counter */
 			TCNT1 = 0;
 			TIFR |= (1<<TOV1); // clear overflow
@@ -179,8 +178,5 @@ char sync_may_poll(void)
 		}
 	}
 
-		
 	return 0;
 }
-
-
