@@ -59,7 +59,7 @@
 #define IO_PIND	_SFR_IO_ADDR(PIND)
 #define IO_EIFR	_SFR_IO_ADDR(EIFR)
 
-#if 1
+#if 0
 #define DEBUG_PORTD_BIT 0x00	/* In PORTD */
 #define DEBUG_ON 	sbi IO_PORTD, DEBUG_PORTD_BIT	; DEBUG
 #define DEBUG_OFF 	cbi IO_PORTD, DEBUG_PORTD_BIT	; DEBUG
