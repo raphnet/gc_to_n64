@@ -7,9 +7,8 @@ See gpl.txt for details.
 -= Relase history =-
 
 September 28, 2015 : Version 1.6
-    - Improved joystick value conversion.
-	  (the old behaviour is available via menu option)
-    - N64 interrupt handler stability improvements
+    - Improved joystick value conversion (the old behaviour is available via menu option).
+    - N64 communication code improvements (now answers as fast as an official controller).
     - Add Atmega168 support
 	- Add visual buzzer (simple LED) support
     - Created a flowchart of the menu

@@ -787,9 +787,11 @@ int main(void)
 	memset((void*)n64_tx_buf0, 0, sizeof(n64_tx_buf0));
 	memset((void*)n64_tx_buf1, 0, sizeof(n64_tx_buf1));
 
-	n64_tx_id_reply[0] = 0x05;
-	n64_tx_id_reply[1] = 0x00;
-	n64_tx_id_reply[2] = 0x02;
+	// Set answer to 0x05 0x00 0x02
+	memset((void*)n64_tx_id_reply, 0, sizeof(n64_tx_id_reply));
+	n64_tx_id_reply[5] = 0x01;
+	n64_tx_id_reply[7] = 0x01;
+	n64_tx_id_reply[22] = 0x01;
 
 	buzzer_init();
 	blips(1);

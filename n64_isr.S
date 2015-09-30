@@ -21,27 +21,24 @@
 ;
 ; 2015-02-07: Updated interrupt name for compilation with recent avr-libc
 ;
+; 2015-09-29: Rewrote (unrolled) reception code. A complete byte, ready for testing
+; for specific values is left in r16. Thanks to this, the firmware now answers requests
+; as fast as an official N64 controller.
+;
+; Also, corrected transmission timing to match official N64 controllers (4us cycles)
+;
 
 #include <avr/io.h>
 
 #include "n64_isr.h"
 #include "compat.h"
 
-#define R7_BIT_UNSWAP_L_Z	0
-#define R7_BIT_SIN			1
-#define R7_BIT_NOSCALE		2
-#define R7_BIT_SCALE_1_5	3
-#define R7_BIT_ALT_1		4
-#define R7_BIT_ALT_2		5
-#define R7_BIT_ALT_3		6
-#define R7_BIT_ALT_4		7
-
 #define N64_RX_BUF_SIZE	33
 
 .lcomm n64_rx_buf, N64_RX_BUF_SIZE
 .lcomm n64_tx_buf0, N64_TX_BUF_SIZE	; reply is 32 bits + 1 stop bit
 .lcomm n64_tx_buf1, N64_TX_BUF_SIZE	;
-.lcomm n64_tx_id_reply 3;
+.lcomm n64_tx_id_reply 24;
 .lcomm n64_got_command 1;
 .lcomm n64_use_buf1 1;
 
@@ -51,7 +48,6 @@
 .global n64_tx_buf0
 .global n64_tx_buf1
 .global n64_tx_id_reply
-.global n64_tx_id2_reply
 .global n64_got_command
 .global n64_use_buf1
 
@@ -61,50 +57,27 @@
 #define IO_PORTD _SFR_IO_ADDR(PORTD)
 #define IO_DDRD _SFR_IO_ADDR(DDRD)
 #define IO_PIND	_SFR_IO_ADDR(PIND)
-#define IO_PORTC _SFR_IO_ADDR(PORTC)
-#define IO_DDRC _SFR_IO_ADDR(DDRC)
-#define IO_PINC _SFR_IO_ADDR(PINC)
-#define IO_PORTB _SFR_IO_ADDR(PORTB)
-#define IO_DDRB _SFR_IO_ADDR(DDRB)
-#define IO_PINB	_SFR_IO_ADDR(PINB)
 #define IO_EIFR	_SFR_IO_ADDR(EIFR)
 
-#define CLK_H_LATCH_H	0x30
-#define CLK_H_LATCH_L	0x20
-#define CLK_L_LATCH_L	0x00
-
+#if 1
 #define DEBUG_PORTD_BIT 0x00	/* In PORTD */
-
-#if 0
-#define DEBUG_ON2 	sbi IO_PORTD, DEBUG_PORTD_BIT	; DEBUG
-#define DEBUG_OFF2 	cbi IO_PORTD, DEBUG_PORTD_BIT	; DEBUG
 #define DEBUG_ON 	sbi IO_PORTD, DEBUG_PORTD_BIT	; DEBUG
 #define DEBUG_OFF 	cbi IO_PORTD, DEBUG_PORTD_BIT	; DEBUG
-#define DEBUG2_ON 	sbi IO_PORTD, DEBUG_PORTD_BIT	; DEBUG
-#define DEBUG2_OFF 	cbi IO_PORTD, DEBUG_PORTD_BIT	; DEBUG
 #else
-#define DEBUG_ON2	nop
-#define DEBUG_OFF2	nop
-#define DEBUG_ON	nop
-#define DEBUG_OFF	nop
-#define DEBUG2_ON	nop
-#define DEBUG2_OFF	nop
+#define DEBUG_ON
+#define DEBUG_OFF
 #endif
 
+/* Note: Changing only this is not enough. The number of LSL and LSR
+	operations in the code also needs an update. */
+#define DATA_BIT	0x02	/* in PORTD */
+#define DATA_MASK	0x04
 
-#define GC_DATA_BIT		0x02	/* in PORTD */
-#define GC_DATA_MASK	0x04	
+#define ALIGN_DELAY			6
+#define STOP_ALIGN_DELAY	3
 
-; 0x06 here combined with the fast command selection code
-; yields a response time of 8.4uS. Much better than
-; the 18.80uS from previous releases.
-;
-; 0x0A : 9.8 uS (eventually fails in F-Zero X)
-;
-#define DATA_FALL_TIMEOUT	0x06
-#define DATA_RAISE_TIMEOUT	0x15 
+#define DATA_FALL_TIMEOUT	0x0A
 
-#define CMD_9BIT_HACK
 
 ; Useful
 #define xl	r26
@@ -116,156 +89,328 @@
 
 
 
+	; R16 : Byte buiding
+	; R17 : Counter for delays
+	; R20 : Holder for value from port
+
 INT0_vect:
-	push r1	
+	push r1
 	in r1, IO_SREG
-	push zl
-	push zh
 	push r20
 	push r16
 	push r17
+	push zl
+	push zh
 	push r23
-	ldi	zl, lo8(n64_rx_buf)
-	ldi zh, hi8(n64_rx_buf)
-#ifdef CMD_9BIT_HACK
-	ldi r16, 9	; HACK : Stop after the 9th bit
-#else
-	ldi r16, N64_RX_BUF_SIZE				; We can accept up to 32 bits
-#endif
-	rjmp fell
 
+	clr r16
+	ldi zl, lo8(pm(interrupt_done_poll))
+	ldi zh, hi8(pm(interrupt_done_poll))
 
-readNextBit:
-	ldi r17, DATA_FALL_TIMEOUT	; setup a timeout
-waitFall:				
-	dec r17						; 1
-	breq rx_complete_f			; 1
-	in r20, IO_PIND				; 1 : read the input port
-	andi r20, GC_DATA_MASK		; 1 : isolate the input bit
-	brne waitFall				; 2 : if still high, loop
+	; All the above instruction provide the correct delay
+	; for the first sample!
 
-	; When we first jump to 'fell' (when the interrupt
-	; occurs), we have already wasted many cycles. Those
-	; delays are there to compensate and make sure we
-	; always sample the data line where we want.
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-fell:
-
-	; Ok, so there is now a 0 on the wire. 
-	;  Worst case, we are at the 9th cycle.
-	;  Best case, we are at the 3rd cycle.
-	;  Let's assume we are at cycle 6.
-
-	;  cycle: 1-16 16-32 32-48 48-64
-	;   high:  0     1     1     1
-	;   low:  0     0     0     1
-
-	;  I check the pin on the 32th cycle which is 
-	;  the safest place. Assuming we are on the 6th cycle,
-	;  we need to waste 26 cycles. This is done by
-	;  adjusting the align_delay subroutine.
-
-	rcall align_delay				; waste enough cycles to be aligned on cycle 32
 	DEBUG_ON
-	in r20, IO_PIND					; read the input port
-	DEBUG_OFF
-	andi r20, GC_DATA_MASK			; isolate the data bit
-	st z+, r20						; store the value
-
-
-	dec r16							; One less bit available...
-	breq rx_overflow
-
-	ldi r17, DATA_RAISE_TIMEOUT
-waitHigh:
-	dec r17
-	breq rx_complete_h
 	in r20, IO_PIND
-	andi r20, GC_DATA_MASK
-	breq waitHigh					; Still high? Keep looping
+	DEBUG_OFF
+	andi r20, DATA_MASK ; 0x04
 
-	rjmp readNextBit
 
-	; At this point, we have read a full 8bit command. 
-	
-rx_overflow:
+	; Now stash the bit in r16 at the first position
+	lsl r20 ; 0x08
+	lsl r20 ; 0x10
+	lsl r20 ; 0x20
+	lsl r20 ; 0x40
+	lsl r20 ; 0x80
+	or r16, r20
 
-#ifndef CMD_9BIT_HACK
-	rjmp interrupt_done_poll
+waitHigh_BIT7:
+	in r20, IO_PIND
+	andi r20, DATA_MASK
+		breq waitHigh_BIT7
 
-rx_complete_f:
-;	DEBUG_ON2
-;	DEBUG_OFF2
-rx_complete_h:
-	
-	; r16 counts down from 	N64_RX_BUF_SIZE
-	
-	ldi r20, N64_RX_BUF_SIZE
-	sub r20, r16   ;  r20 = N64_RX_BUF - r16
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; BIT 6
+	ldi r17, DATA_FALL_TIMEOUT
+bit6_wait_fall:
+	dec r17
+	breq bit6_fall_timeout
+	in r20, IO_PIND
+	andi r20, DATA_MASK
+	brne bit6_wait_fall
+	rjmp bit6_align
 
-	; Longer commands for rumble or memory card ignored (for now).
-	; So jump to interrupt_done_poll in that case.
-	cpi r20, 9
-	brne interrupt_done_poll
-#else
+bit6_fall_timeout:
+	ijmp ; To Z
 
-rx_complete_f:
-rx_complete_h:
-#endif
+bit6_align:
+	ldi r17, ALIGN_DELAY
+bit6_align_lp:
+	dec r17
+		brne bit6_align_lp
+
+	DEBUG_ON
+	in r20, IO_PIND
+	DEBUG_OFF
+	andi r20, DATA_MASK ; 0x04
+	lsl r20 ; 0x08
+	lsl r20 ; 0x10
+	lsl r20 ; 0x20
+	lsl r20 ; 0x40
+	or r16, r20
+
+waitHigh_BIT6:
+	in r20, IO_PIND
+	andi r20, DATA_MASK
+		breq waitHigh_BIT6
+
+
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; BIT 5
+	ldi r17, DATA_FALL_TIMEOUT
+bit5_wait_fall:
+	dec r17
+	breq bit5_fall_timeout
+	in r20, IO_PIND
+	andi r20, DATA_MASK
+	brne bit5_wait_fall
+	rjmp bit5_align
+
+bit5_fall_timeout:
+	ijmp ; To Z 
+
+bit5_align:
+	ldi r17, ALIGN_DELAY
+bit5_align_lp:
+	dec r17
+		brne bit5_align_lp
+
+	DEBUG_ON
+	in r20, IO_PIND
+	DEBUG_OFF
+	andi r20, DATA_MASK ; 0x04
+	lsl r20 ; 0x08
+	lsl r20 ; 0x10
+	lsl r20 ; 0x20
+	or r16, r20
+
+waitHigh_bit5:
+	in r20, IO_PIND
+	andi r20, DATA_MASK
+		breq waitHigh_bit5
+
+
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; BIT 4
+	ldi r17, DATA_FALL_TIMEOUT
+bit4_wait_fall:
+	dec r17
+	breq bit4_fall_timeout
+	in r20, IO_PIND
+	andi r20, DATA_MASK
+	brne bit4_wait_fall
+	rjmp bit4_align
+
+bit4_fall_timeout:
+	ijmp ; To Z
+
+bit4_align:
+	ldi r17, ALIGN_DELAY
+bit4_align_lp:
+	dec r17
+		brne bit4_align_lp
+
+	DEBUG_ON
+	in r20, IO_PIND
+	DEBUG_OFF
+	andi r20, DATA_MASK ; 0x04
+	lsl r20 ; 0x08
+	lsl r20 ; 0x10
+	or r16, r20
+
+waitHigh_bit4:
+	in r20, IO_PIND
+	andi r20, DATA_MASK
+		breq waitHigh_bit4
+
+
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; BIT 3
+	ldi r17, DATA_FALL_TIMEOUT
+bit3_wait_fall:
+	dec r17
+	breq bit3_fall_timeout
+	in r20, IO_PIND
+	andi r20, DATA_MASK
+	brne bit3_wait_fall
+	rjmp bit3_align
+
+bit3_fall_timeout:
+	ijmp ; To Z
+
+bit3_align:
+	ldi r17, ALIGN_DELAY
+bit3_align_lp:
+	dec r17
+		brne bit3_align_lp
+
+	DEBUG_ON
+	in r20, IO_PIND
+	DEBUG_OFF
+	andi r20, DATA_MASK ; 0x04
+	lsl r20 ; 0x08
+	or r16, r20
+
+waitHigh_bit3:
+	in r20, IO_PIND
+	andi r20, DATA_MASK
+		breq waitHigh_bit3
+
+
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; BIT 2
+	ldi r17, DATA_FALL_TIMEOUT
+bit2_wait_fall:
+	dec r17
+	breq bit2_fall_timeout
+	in r20, IO_PIND
+	andi r20, DATA_MASK
+	brne bit2_wait_fall
+	rjmp bit2_align
+
+bit2_fall_timeout:
+	ijmp ; To Z
+
+bit2_align:
+	ldi r17, ALIGN_DELAY
+bit2_align_lp:
+	dec r17
+		brne bit2_align_lp
+
+	DEBUG_ON
+	in r20, IO_PIND
+	DEBUG_OFF
+	andi r20, DATA_MASK ; 0x04
+	or r16, r20
+
+waitHigh_bit2:
+	in r20, IO_PIND
+	andi r20, DATA_MASK
+		breq waitHigh_bit2
+
+
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; BIT 1
+	ldi r17, DATA_FALL_TIMEOUT
+bit1_wait_fall:
+	dec r17
+	breq bit1_fall_timeout
+	in r20, IO_PIND
+	andi r20, DATA_MASK
+	brne bit1_wait_fall
+	rjmp bit1_align
+
+bit1_fall_timeout:
+	ijmp ; To Z
+
+bit1_align:
+	ldi r17, ALIGN_DELAY
+bit1_align_lp:
+	dec r17
+		brne bit1_align_lp
+
+	DEBUG_ON
+	in r20, IO_PIND
+	DEBUG_OFF
+	andi r20, DATA_MASK ; 0x04
+	lsr r20 ; 0x02
+	or r16, r20
+
+waitHigh_bit1:
+	in r20, IO_PIND
+	andi r20, DATA_MASK
+		breq waitHigh_bit1
+
+
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; BIT 0
+	ldi r17, DATA_FALL_TIMEOUT
+bit0_wait_fall:
+	dec r17
+	breq bit0_fall_timeout
+	in r20, IO_PIND
+	andi r20, DATA_MASK
+	brne bit0_wait_fall
+	rjmp bit0_align
+
+bit0_fall_timeout:
+	ijmp ; To Z
+
+bit0_align:
+	ldi r17, ALIGN_DELAY
+bit0_align_lp:
+	dec r17
+		brne bit0_align_lp
+
+	DEBUG_ON
+	in r20, IO_PIND
+	DEBUG_OFF
+	andi r20, DATA_MASK ; 0x04
+	lsr r20 ; 0x02
+	lsr r20 ; 0x01
+	or r16, r20
+
+waitHigh_bit0:
+	in r20, IO_PIND
+	andi r20, DATA_MASK
+		breq waitHigh_bit0
+
+
+
+
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; STOP BIT
+	ldi r17, DATA_FALL_TIMEOUT
+stop1_wait_fall:
+	dec r17
+	breq stop1_fall_timeout
+	in r20, IO_PIND
+	andi r20, DATA_MASK
+	brne stop1_wait_fall
+	rjmp stop1_align
+
+stop1_fall_timeout:
+	ijmp ; To Z
+
+	; Waste the right amount of cycles to make sure we
+	; answer as fast as real N64 controller, and not faster.
+stop1_align:
+	ldi r17, STOP_ALIGN_DELAY
+stop1_align_lp:
+	dec r17
+		brne stop1_align_lp
+
+
 
 got_8bit_command:
-
 	; Commands:
 	; 0x00 : Get capability
 	; 0x01 : Get button status
-	
+	; 0xff : Reset
 
-	; repoint Z to origin of reception buffer	
-	ldi	zl, lo8(n64_rx_buf)
-	ldi zh, hi8(n64_rx_buf)
+	; Unsupported commands 0x02 0x03 (multi-byte)
 
-#ifdef SLOW_VERSION
-	; Convert from 8 bytes to one byte, reult in r20
-	rcall rx_buf_to_byte
-
-	tst r20	; 0x00
-	breq cap
-
-	cpi r20, 0x01
-	breq stat
-
-	cpi r20, 0xff
-	breq cap2
-#else
-	; Detect 0xff by looking at the most significant bit
-	ld r20, z
-	tst r20
-	brne cap2
-
-	; Detect 0x00 or 0x01 by looking at the least significant bit
-	ldd r20, z+7
-	tst r20
-	breq cap
-
+	cpi r16, 0x01	; GET STATUS
+	brne check_other_commands
 	rcall sendStatus
+	rjmp interrupt_done_poll
 
-		rjmp interrupt_done_poll
+check_other_commands:
+	cpi r16, 0x00	; GET CAPABILITIES
+	breq cap
 
-#endif
+	cpi r16, 0xff	; RESET (Same answer as get caps 0x00)
+	breq cap
 
-	DEBUG2_ON
-	nop
-	nop
-	DEBUG2_OFF
 	; ignore unknwn
 	rjmp interrupt_done_poll
+
+cap:
+	rcall sendCapabilityWord
+	rjmp interrupt_done_poll
+
 
 interrupt_done_poll:
 
@@ -275,6 +420,7 @@ interrupt_done_poll:
 	ldi zh, hi8(n64_got_command)
 	st z, r20
 
+; Clear the interrupt flag
 #ifndef AT168_COMPATIBLE
 	ldi r20, 0x40 ; INTF0
 	sts GIFR, r20
@@ -282,117 +428,24 @@ interrupt_done_poll:
 	sbi IO_EIFR, 0 ; Clear INTF0
 #endif
 
+;;;;;; INTERRUPT RETURN CODE
 	pop r23
-	pop r17
-	pop r16	
-	pop r20
 	pop zh
 	pop zl
+	pop r17
+	pop r16
+	pop r20
 	out IO_SREG, r1
 	pop r1
-
 	reti
 
-
-cap2:
-cap:
-	rcall sendCapabilityWord
-	rjmp interrupt_done_poll
-
-
-;stat:
-;		rcall sendStatus
-;	rjmp interrupt_done_poll
-
-	/*********************** DELAY *************/
-align_delay:
-	ldi r17, 2
-lp634534:
-	dec r17
-	brne lp634534
-	ret
-
-
-
-
-	/***************
-	Convert 8 bytes from the receive buffer
-	to one byte (repack)
-
-	receive buffer in Z, Z increased by 8 side effect
-	8 bit value in r20
-
-	First byte will be MSB
-	****************/
-rx_buf_to_byte:
-	push r16
-	push r17
-
-	clr r20
-	ldi r16, 0x80
-
-nbb:
-	ld r17, z+ ; load byte
-
-	tst r17		; if clear, skip bit setting
-	breq noset
-
-	or r20, r16
-
-noset:
-	lsr r16		; shift for next bit
-	brne nbb	; loop until 0
-
-rxb_ret:
-	pop r17
-	pop r16
-	ret
-
-
-	/**********
-	unpack bits to several bytes
-	source in r20.
-	Writes to Z. Increments Z.
-	Byte MSB out first.
-	************/
-byte_to_rxbuf:
-	push r16
-	push r17
-
-	ldi r16, 0x80
-nbrrr:
-	mov r17, r20
-	and r17, r16
-	st z+, r17
-	lsr r16
-	brne nbrrr
-
-	pop r17
-	pop r16
-	ret
-
-
+	/******************************************
+	Point Z to the 'capabilities' contant
+	and sent it.
+	******************************************/
 sendCapabilityWord:
-	push xl
-	push xh
-
-	ldi xl, lo8(n64_tx_id_reply)
-	ldi xh, hi8(n64_tx_id_reply)
-	ldi zl, lo8(n64_rx_buf)
-	ldi zh, hi8(n64_rx_buf)
-
-	ld r20, x+
-	rcall byte_to_rxbuf
-	ld r20, x+
-	rcall byte_to_rxbuf
-	ld r20, x+
-	rcall byte_to_rxbuf
-
-	pop xh
-	pop xl
-
-	ldi zl, lo8(n64_rx_buf)
-	ldi zh, hi8(n64_rx_buf)
+	ldi zl, lo8(n64_tx_id_reply)
+	ldi zh, hi8(n64_tx_id_reply)
 	ldi r23, 24
 	rcall sendGCData
 	ret
@@ -464,17 +517,17 @@ lp_sendGCData_bits:
 	brne send1
 	nop
 send0:
-	sbi IO_DDRD, GC_DATA_BIT	; Pull bus to 0
+	sbi IO_DDRD, DATA_BIT	; Pull bus to 0
 
-	ldi r20, 20
+	ldi r20, 15
 lp_send0_3us:
 	dec r20
 	brne lp_send0_3us
 	nop
 
-	cbi IO_DDRD, GC_DATA_BIT	; Release bus to 1
+	cbi IO_DDRD, DATA_BIT	; Release bus to 1
 
-	ldi r20, 4
+	ldi r20, 2
 lp_send0_1us:
 	dec r20
 	brne lp_send0_1us
@@ -489,13 +542,13 @@ lp_send0_1us:
 	nop
 	nop
 	; STOP BIT
-	sbi IO_DDRD, GC_DATA_BIT ; Pull low for stop bit
-	ldi r20, 8
+	sbi IO_DDRD, DATA_BIT ; Pull low for stop bit
+	ldi r20, 4
 stbdly0:
 	dec r20
 	brne stbdly0
 	nop
-	cbi IO_DDRD, GC_DATA_BIT ;	Release
+	cbi IO_DDRD, DATA_BIT ;	Release
 
 	pop r23
 	pop r20
@@ -503,18 +556,18 @@ stbdly0:
 	ret
 
 send1:
-	sbi IO_DDRD, GC_DATA_BIT	; Pull bus to 0
+	sbi IO_DDRD, DATA_BIT	; Pull bus to 0
 
-	ldi r20, 6
+	ldi r20, 4
 lp_send1_1us:
 	dec r20
 	brne lp_send1_1us
 	nop
 	nop
 
-	cbi IO_DDRD, GC_DATA_BIT	; Release bus to 1
+	cbi IO_DDRD, DATA_BIT	; Release bus to 1
 
-	ldi r20, 18
+	ldi r20, 12
 lp_send1_3us:
 	dec r20
 	brne lp_send1_3us
@@ -532,13 +585,13 @@ lp_send1_3us:
 	nop
 
 	; STOP BIT
-	sbi IO_DDRD, GC_DATA_BIT ; Pull low for stop bit
+	sbi IO_DDRD, DATA_BIT ; Pull low for stop bit
 	ldi r20,4
 stbdly1:
 	dec r20
 	brne stbdly1
 	nop
-	cbi IO_DDRD, GC_DATA_BIT	; Release
+	cbi IO_DDRD, DATA_BIT	; Release
 
 waithigh:
 	ldi r20, 0xff
@@ -546,7 +599,7 @@ waithigh_lp:
 	dec r20
 	breq waithigh_done
 
-	sbic IO_PIND, GC_DATA_BIT
+	sbic IO_PIND, DATA_BIT
 	rjmp waithigh_done
 	nop
 	nop
