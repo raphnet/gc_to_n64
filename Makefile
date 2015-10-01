@@ -2,9 +2,10 @@ CC=avr-gcc
 AS=$(CC)
 LD=$(CC)
 
+VERSION=1.6
 CPU=atmega8
 UISP=uisp -dprog=stk500 -dpart=atmega8 -dserial=/dev/avr
-CFLAGS=-Wall -mmcu=$(CPU) -DF_CPU=16000000L -Os
+CFLAGS=-Wall -mmcu=$(CPU) -DF_CPU=16000000L -Os -DVERSION_STR=\"$(VERSION)\"
 LDFLAGS=-mmcu=$(CPU) -Wl,-Map=gc_to_n64.map
 HEXFILE=gc_to_n64.hex
 AVRDUDE=avrdude

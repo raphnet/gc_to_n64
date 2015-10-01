@@ -715,9 +715,46 @@ static void gc_report_to_mapping(const unsigned char gcr[GC_REPORT_SIZE], struct
 
 #define IS_ACTIVE(a) ((a).value != (a).def)
 
-void n64_status_to_output(struct mapping_controller_unit *n64s, unsigned char volatile dstbuf[32])
+unsigned char long_command_handler(unsigned char len)
+{
+	if (len >= 2)
+	{
+		if (n64_rx_buf[0] == 'R') {
+			switch (n64_rx_buf[1]) {
+				case 0x01: // Get info
+					n64_misc_buf[0] = g_eeprom_data.defmap;
+					n64_misc_buf[1] = g_eeprom_data.deadzone_enabled;
+					n64_misc_buf[2] = g_eeprom_data.old_v1_5_conversion;
+					strcpy((void*)(n64_misc_buf+10), VERSION_STR);
+					return 10 + strlen(VERSION_STR) + 1;
+			}
+		}
+	}
+	return 0;
+}
+
+void packbytes(unsigned char *input, unsigned char volatile *output, int bytes)
+{
+	int i;
+	unsigned char b;
+	unsigned char tmp;
+
+	for (i=0; i<bytes; i++) {
+		for (tmp=0, b=0x80; b; b >>= 1) {
+			if (*input) {
+				tmp |= b;
+			}
+			input++;
+		}
+		*output = tmp;
+		output++;
+	}
+}
+
+void n64_status_to_output(struct mapping_controller_unit *n64s, unsigned char volatile output[4])
 {
 	char x,y;
+	unsigned char dstbuf[32];
 
 	dstbuf[0] = IS_ACTIVE(n64s[MAP_N64_BTN_A]);
 	dstbuf[1] = IS_ACTIVE(n64s[MAP_N64_BTN_B]);
@@ -751,6 +788,7 @@ void n64_status_to_output(struct mapping_controller_unit *n64s, unsigned char vo
 	byteTo8Bytes(x, dstbuf + 16);
 	byteTo8Bytes((y)^0xff, dstbuf + 24);
 
+	packbytes(dstbuf, output, 4);
 }
 
 int main(void)
@@ -788,10 +826,9 @@ int main(void)
 	memset((void*)n64_tx_buf1, 0, sizeof(n64_tx_buf1));
 
 	// Set answer to 0x05 0x00 0x02
-	memset((void*)n64_tx_id_reply, 0, sizeof(n64_tx_id_reply));
-	n64_tx_id_reply[5] = 0x01;
-	n64_tx_id_reply[7] = 0x01;
-	n64_tx_id_reply[22] = 0x01;
+	n64_tx_id_reply[0] = 0x05;
+	n64_tx_id_reply[1] = 0x00;
+	n64_tx_id_reply[2] = 0x02;
 
 	buzzer_init();
 	blips(1);

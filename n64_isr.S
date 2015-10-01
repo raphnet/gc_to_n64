@@ -21,11 +21,19 @@
 ;
 ; 2015-02-07: Updated interrupt name for compilation with recent avr-libc
 ;
-; 2015-09-29: Rewrote (unrolled) reception code. A complete byte, ready for testing
+; 2015-09-29: Rewrote (unrolled) reception code.
 ; for specific values is left in r16. Thanks to this, the firmware now answers requests
 ; as fast as an official N64 controller.
 ;
 ; Also, corrected transmission timing to match official N64 controllers (4us cycles)
+;
+; 2015-09-30: Improved reception code to support multi-byte commands. This
+; adds a delay because we wait for a timeout at the 9th bit, but it should be possible
+; to test the value in r16 right away and jump out of the rx code to save time when
+; a supported 8bit command is received.
+;
+; Also rewrote the transmission function. Now one bit occupies one bit (no more
+; one byte per bit waste). Code tweaked for clean 1us/3us timing even across the byte boundary.
 ;
 
 #include <avr/io.h>
@@ -36,9 +44,10 @@
 #define N64_RX_BUF_SIZE	33
 
 .lcomm n64_rx_buf, N64_RX_BUF_SIZE
-.lcomm n64_tx_buf0, N64_TX_BUF_SIZE	; reply is 32 bits + 1 stop bit
-.lcomm n64_tx_buf1, N64_TX_BUF_SIZE	;
-.lcomm n64_tx_id_reply 24;
+.lcomm n64_tx_buf0, 4
+.lcomm n64_tx_buf1, 4
+.lcomm n64_misc_buf, 33
+.lcomm n64_tx_id_reply 3;
 .lcomm n64_got_command 1;
 .lcomm n64_use_buf1 1;
 
@@ -50,6 +59,8 @@
 .global n64_tx_id_reply
 .global n64_got_command
 .global n64_use_buf1
+.global long_command_handler
+.global n64_misc_buf
 
 ;.global sendGCData
 
@@ -73,7 +84,8 @@
 #define DATA_BIT	0x02	/* in PORTD */
 #define DATA_MASK	0x04
 
-#define ALIGN_DELAY			6
+#define ALIGN_DELAY				6
+#define ALIGN_DELAY_NEXT_BYTE	5
 #define STOP_ALIGN_DELAY	3
 
 #define DATA_FALL_TIMEOUT	0x0A
@@ -102,10 +114,15 @@ INT0_vect:
 	push zl
 	push zh
 	push r23
+	push xl
+	push xh
+	ldi xl, lo8(n64_rx_buf)
+	ldi xh, hi8(n64_rx_buf)
 
+next_byte:
 	clr r16
-	ldi zl, lo8(pm(interrupt_done_poll))
-	ldi zh, hi8(pm(interrupt_done_poll))
+	ldi zl, lo8(pm(bit_timed_out))
+	ldi zh, hi8(pm(bit_timed_out))
 
 	; All the above instruction provide the correct delay
 	; for the first sample!
@@ -358,31 +375,82 @@ waitHigh_bit0:
 	andi r20, DATA_MASK
 		breq waitHigh_bit0
 
+	st x+, r16
 
-
-
-	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; STOP BIT
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; BIT 7 (next byte)
 	ldi r17, DATA_FALL_TIMEOUT
-stop1_wait_fall:
+bit7_wait_fall:
 	dec r17
-	breq stop1_fall_timeout
+	breq bit7_fall_timeout
 	in r20, IO_PIND
 	andi r20, DATA_MASK
-	brne stop1_wait_fall
-	rjmp stop1_align
+	brne bit7_wait_fall
+	rjmp bit7_align
 
-stop1_fall_timeout:
+bit7_fall_timeout:
 	ijmp ; To Z
 
-	; Waste the right amount of cycles to make sure we
-	; answer as fast as real N64 controller, and not faster.
-stop1_align:
-	ldi r17, STOP_ALIGN_DELAY
-stop1_align_lp:
+bit7_align:
+	ldi r17, ALIGN_DELAY_NEXT_BYTE
+bit7_align_lp:
 	dec r17
-		brne stop1_align_lp
+		brne bit7_align_lp
+
+	rjmp next_byte
 
 
+bit_timed_out:
+	; Each _complete_ byte we receive is stored in x with post increment.
+	; X is initially pointed to n64_rx_buf.
+	; Calculate how many bytes we received using the current value of X.
+	ldi r16, lo8(n64_rx_buf)
+	sub xl, r16 ; Bug/limitation: 8-bit arithmetic. Only up to 255 bytes.
+	breq interrupt_done_poll ; Nothing received / incomplete single byte. Abort.
+
+	; Normal commands are 1 byte.
+	cpi xl, 0x01
+	breq got_8bit_command
+
+	;;;;;; CALLING A C FUNCTION
+	push r0
+	push r18
+	push r19
+	push r20
+	push r21
+	push r22
+	push r23
+	push r24
+	push r25
+	push r26
+	push r27
+	push r31
+
+	mov r24, r16	; Argument 1 (len)
+	clr r1
+
+	ldi zl, lo8(pm(long_command_handler))
+	ldi zh, hi8(pm(long_command_handler))
+	icall
+
+	mov r16, r24 ; Return value
+
+	pop r31
+	pop r27
+	pop r26
+	pop r25
+	pop r24
+	pop r23
+	pop r22
+	pop r21
+	pop r20
+	pop r19
+	pop r18
+	pop r0
+
+	; r16 is the length to transmit
+	rcall sendMisc
+
+	rjmp interrupt_done_poll
 
 got_8bit_command:
 	; Commands:
@@ -390,7 +458,9 @@ got_8bit_command:
 	; 0x01 : Get button status
 	; 0xff : Reset
 
-	; Unsupported commands 0x02 0x03 (multi-byte)
+	ldi xl, lo8(n64_rx_buf)
+	ldi xh, hi8(n64_rx_buf)
+	ld r16, x
 
 	cpi r16, 0x01	; GET STATUS
 	brne check_other_commands
@@ -412,6 +482,7 @@ cap:
 	rjmp interrupt_done_poll
 
 
+
 interrupt_done_poll:
 
 ; Notify the main loop about the poll
@@ -429,6 +500,8 @@ interrupt_done_poll:
 #endif
 
 ;;;;;; INTERRUPT RETURN CODE
+	pop xh
+	pop xl
 	pop r23
 	pop zh
 	pop zl
@@ -439,6 +512,14 @@ interrupt_done_poll:
 	pop r1
 	reti
 
+	/* Arg (length) in r16 */
+sendMisc:
+	ldi zl, lo8(n64_misc_buf)
+	ldi zh, hi8(n64_misc_buf)
+	mov r23, r16
+	rcall sendGCData
+	ret
+
 	/******************************************
 	Point Z to the 'capabilities' contant
 	and sent it.
@@ -446,7 +527,7 @@ interrupt_done_poll:
 sendCapabilityWord:
 	ldi zl, lo8(n64_tx_id_reply)
 	ldi zh, hi8(n64_tx_id_reply)
-	ldi r23, 24
+	ldi r23, 3
 	rcall sendGCData
 	ret
 
@@ -471,7 +552,7 @@ useBuf1:
 
 bufferSelected:
 	; Send the packet
-	ldi r23, 32
+	ldi r23, 4
 dosendGCData:
 	rcall sendGCData
 	ret
@@ -494,30 +575,31 @@ dosendGCData:
 	* is 48 cycles.
 	*
 	* Number of bits to send is passed in r23
-	* Z must point to first byte of data. Every byte
-	* represents one bit (programming laziness..). A logic
-	* 1 is sent when a byte is non-zero.
+	* Z must point to first byte of data.
 	*
 	* A stop bit is added at thy end of the packet.
 	*
-	* Used registers: r19, r20
+	* Note: registers available are r16, r17, r20 and r23
 	************************************************/
 sendGCData:
 	push r19
-	push r20
-	push r23
 
-;	pop r23
-;	pop r20
-;	pop r19
+send_next_byte:
+	; Check if this is the last byte.
+	tst r23
+	breq send_stop
+	dec r23
+	ld r16, z+
+	ldi r17, 0x80 ; mask
 
-lp_sendGCData_bits:
-	ld r19, z+
-	tst r19
+send_next_bit:
+	mov r19, r16
+	and r19, r17
 	brne send1
 	nop
+
 send0:
-	sbi IO_DDRD, DATA_BIT	; Pull bus to 0
+	sbi IO_DDRD, DATA_BIT   ; Pull bus to 0
 
 	ldi r20, 15
 lp_send0_3us:
@@ -527,33 +609,16 @@ lp_send0_3us:
 
 	cbi IO_DDRD, DATA_BIT	; Release bus to 1
 
-	ldi r20, 2
-lp_send0_1us:
-	dec r20
-	brne lp_send0_1us
 
-	dec r23
-	brne lp_sendGCData_bits
-
+	lsr r17
+	breq send_next_byte
 	nop
 	nop
 	nop
 	nop
 	nop
 	nop
-	; STOP BIT
-	sbi IO_DDRD, DATA_BIT ; Pull low for stop bit
-	ldi r20, 4
-stbdly0:
-	dec r20
-	brne stbdly0
-	nop
-	cbi IO_DDRD, DATA_BIT ;	Release
-
-	pop r23
-	pop r20
-	pop r19
-	ret
+	rjmp send_next_bit
 
 send1:
 	sbi IO_DDRD, DATA_BIT	; Pull bus to 0
@@ -567,51 +632,35 @@ lp_send1_1us:
 
 	cbi IO_DDRD, DATA_BIT	; Release bus to 1
 
-	ldi r20, 12
+	ldi r20, 10
 lp_send1_3us:
 	dec r20
 	brne lp_send1_3us
 	nop
 	nop
 
-	dec r23
-	brne lp_sendGCData_bits
+	lsr r17
+	breq send_next_byte
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	rjmp send_next_bit
 
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-
+send_stop:
 	; STOP BIT
 	sbi IO_DDRD, DATA_BIT ; Pull low for stop bit
-	ldi r20,4
-stbdly1:
+	ldi r20, 4
+stbdly0:
 	dec r20
-	brne stbdly1
+	brne stbdly0
 	nop
-	cbi IO_DDRD, DATA_BIT	; Release
+	cbi IO_DDRD, DATA_BIT ;	Release
 
-waithigh:
-	ldi r20, 0xff
-waithigh_lp:
-	dec r20
-	breq waithigh_done
-
-	sbic IO_PIND, DATA_BIT
-	rjmp waithigh_done
-	nop
-	nop
-	nop
-	nop
-	rjmp waithigh_lp
-
-waithigh_done:
-
-	pop r23
-	pop r20
+done_send:
 	pop r19
-
 	ret
+
 
