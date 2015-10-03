@@ -67,6 +67,8 @@ unsigned char n64_rx_callback(unsigned char len)
 				// [2][3] : Block id
 				memcpy_PF((void*)g_n64_buf, g_n64_buf[3] * 32L, 32);
 				return 32;
+
+
 		}
 	}
 

@@ -2,12 +2,14 @@ CC=avr-gcc
 AS=$(CC)
 LD=$(CC)
 
-BOOTSTART=0x1800 # note: byte address
-VERSION=1.0
-PROGNAME=siboot
 CPU=atmega8
-UISP=uisp -dprog=stk500 -dpart=atmega8 -dserial=/dev/avr
-CFLAGS=-Wall -mmcu=$(CPU) -DF_CPU=16000000L -Os -DVERSION_STR=\"$(VERSION)\" -DPAGE_SIZE=64 -DBOOTSTART=$(BOOTSTART)
+BOOTSTART=0x1800 # note: byte address
+PAGE_SIZE=64 # bytes
+
+PROGNAME=siboot
+VERSION=1.0
+
+CFLAGS=-Wall -mmcu=$(CPU) -DF_CPU=16000000L -Os -DVERSION_STR=\"$(VERSION)\" -DPAGE_SIZE=$(PAGE_SIZE) -DBOOTSTART=$(BOOTSTART)
 LDFLAGS=-mmcu=$(CPU) -Wl,-Map=siboot.map -Wl,--section-start=.text=$(BOOTSTART)
 HEXFILE=siboot.hex
 AVRDUDE=avrdude
