@@ -41,26 +41,26 @@
 #include "n64_isr.h"
 #include "compat.h"
 
-#define N64_RX_BUF_SIZE	33
+//#define N64_RX_BUF_SIZE	40
 
-.lcomm n64_rx_buf, N64_RX_BUF_SIZE
+.lcomm g_n64_buf, N64_BUF_SIZE
 .lcomm n64_tx_buf0, 4
 .lcomm n64_tx_buf1, 4
-.lcomm n64_misc_buf, 33
+;.lcomm n64_misc_buf, 40
 .lcomm n64_tx_id_reply 3;
 .lcomm n64_got_command 1;
 .lcomm n64_use_buf1 1;
 
 .text
 .global INT0_vect
-.global n64_rx_buf
+.global g_n64_buf
 .global n64_tx_buf0
 .global n64_tx_buf1
 .global n64_tx_id_reply
 .global n64_got_command
 .global n64_use_buf1
 .global long_command_handler
-.global n64_misc_buf
+;.global n64_misc_buf
 
 ;.global sendGCData
 
@@ -116,8 +116,8 @@ INT0_vect:
 	push r23
 	push xl
 	push xh
-	ldi xl, lo8(n64_rx_buf)
-	ldi xh, hi8(n64_rx_buf)
+	ldi xl, lo8(g_n64_buf)
+	ldi xh, hi8(g_n64_buf)
 
 next_byte:
 	clr r16
@@ -401,9 +401,9 @@ bit7_align_lp:
 
 bit_timed_out:
 	; Each _complete_ byte we receive is stored in x with post increment.
-	; X is initially pointed to n64_rx_buf.
+	; X is initially pointed to g_n64_buf.
 	; Calculate how many bytes we received using the current value of X.
-	ldi r16, lo8(n64_rx_buf)
+	ldi r16, lo8(g_n64_buf)
 	sub xl, r16 ; Bug/limitation: 8-bit arithmetic. Only up to 255 bytes.
 	breq interrupt_done_poll ; Nothing received / incomplete single byte. Abort.
 
@@ -413,6 +413,7 @@ bit_timed_out:
 
 	;;;;;; CALLING A C FUNCTION
 	push r0
+	push r1
 	push r18
 	push r19
 	push r20
@@ -425,12 +426,13 @@ bit_timed_out:
 	push r27
 	push r31
 
-	mov r24, r16	; Argument 1 (len)
+	mov r24, xl	; Argument 1 (len)
 	clr r1
 
 	ldi zl, lo8(pm(long_command_handler))
 	ldi zh, hi8(pm(long_command_handler))
 	icall
+;	clr r24
 
 	mov r16, r24 ; Return value
 
@@ -445,6 +447,7 @@ bit_timed_out:
 	pop r20
 	pop r19
 	pop r18
+	pop r1
 	pop r0
 
 	; r16 is the length to transmit
@@ -458,8 +461,8 @@ got_8bit_command:
 	; 0x01 : Get button status
 	; 0xff : Reset
 
-	ldi xl, lo8(n64_rx_buf)
-	ldi xh, hi8(n64_rx_buf)
+	ldi xl, lo8(g_n64_buf)
+	ldi xh, hi8(g_n64_buf)
 	ld r16, x
 
 	cpi r16, 0x01	; GET STATUS
@@ -514,8 +517,8 @@ interrupt_done_poll:
 
 	/* Arg (length) in r16 */
 sendMisc:
-	ldi zl, lo8(n64_misc_buf)
-	ldi zh, hi8(n64_misc_buf)
+	ldi zl, lo8(g_n64_buf)
+	ldi zh, hi8(g_n64_buf)
 	mov r23, r16
 	rcall sendGCData
 	ret
@@ -583,6 +586,9 @@ dosendGCData:
 	************************************************/
 sendGCData:
 	push r19
+
+	tst r23
+	breq done_send
 
 send_next_byte:
 	; Check if this is the last byte.

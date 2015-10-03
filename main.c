@@ -719,14 +719,48 @@ unsigned char long_command_handler(unsigned char len)
 {
 	if (len >= 2)
 	{
-		if (n64_rx_buf[0] == 'R') {
-			switch (n64_rx_buf[1]) {
+		if (g_n64_buf[0] == 'R') {
+			switch (g_n64_buf[1]) {
+				case 0x00: // echo
+					return len;
+
 				case 0x01: // Get info
-					n64_misc_buf[0] = g_eeprom_data.defmap;
-					n64_misc_buf[1] = g_eeprom_data.deadzone_enabled;
-					n64_misc_buf[2] = g_eeprom_data.old_v1_5_conversion;
-					strcpy((void*)(n64_misc_buf+10), VERSION_STR);
+					memset(g_n64_buf, 0, sizeof(g_n64_buf));
+					g_n64_buf[0] = 0; // Isbootloader? No.
+					g_n64_buf[1] = g_eeprom_data.defmap;
+					g_n64_buf[2] = g_eeprom_data.deadzone_enabled;
+					g_n64_buf[3] = g_eeprom_data.old_v1_5_conversion;
+					strcpy((void*)(g_n64_buf+10), VERSION_STR);
 					return 10 + strlen(VERSION_STR) + 1;
+
+				case 0x02: // Get mapping
+					if (len >= 3) {
+						int id = g_n64_buf[2];
+						int chunk = g_n64_buf[3];
+						unsigned short mapping_size = sizeof(current_mapping);
+
+						if (id >= 1 && id <= 4) {
+							unsigned char *mapping_pointer;
+
+							mapping_pointer = g_eeprom_data.appdata + (sizeof(current_mapping) * (id-1));
+
+							if (chunk == 0) {
+								g_n64_buf[0] = mapping_size & 0xff;
+								return 1;
+							} else {
+								if (chunk == 1) {
+									memcpy((void*)g_n64_buf, mapping_pointer, 32);
+									return 32;
+								} else if (chunk == 2) {
+									memcpy((void*)g_n64_buf, mapping_pointer + 32, sizeof(current_mapping) - 32);
+									return sizeof(current_mapping) - 32;
+								}
+							}
+
+							return 0;
+						}
+					}
+					break;
 			}
 		}
 	}

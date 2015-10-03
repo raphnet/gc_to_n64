@@ -1,9 +1,8 @@
-#define N64_RX_BUF_SIZE 33
-#define N64_TX_BUF_SIZE	32
+#define N64_BUF_SIZE 40
 
 #ifndef __ASSEMBLER__
 
-extern volatile unsigned char n64_rx_buf[32];
+extern volatile unsigned char g_n64_buf[N64_BUF_SIZE];
 
 // doublebuffered to prevent glitches in analog stick.
 // see int_r8_use_buf1
@@ -18,6 +17,6 @@ extern volatile unsigned char n64_got_command;
 
 extern volatile unsigned char n64_use_buf1;
 
-extern volatile unsigned char n64_misc_buf[33];
+//extern volatile unsigned char n64_misc_buf[33];
 
 #endif
