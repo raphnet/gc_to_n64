@@ -2,19 +2,18 @@ CC=avr-gcc
 AS=$(CC)
 LD=$(CC)
 
-CPU=atmega8
-BOOTSTART=0x1800 # note: byte address
-PAGE_SIZE=64 # bytes
+CPU=atmega168
+BOOTSTART=0x3800 # note: byte address
+PAGE_SIZE=128 # bytes
 
 PROGNAME=siboot
 VERSION=1.0
 
-CFLAGS=-Wall -mmcu=$(CPU) -DF_CPU=16000000L -Os -DVERSION_STR=\"$(VERSION)\" -DPAGE_SIZE=$(PAGE_SIZE) -DBOOTSTART=$(BOOTSTART)
+CFLAGS=-Wall -mmcu=$(CPU) -DF_CPU=16000000L -Os -DVERSION_STR=\"$(VERSION)\" -DPAGE_SIZE=$(PAGE_SIZE) -DBOOTSTART=$(BOOTSTART) -DWITH_LED
 LDFLAGS=-mmcu=$(CPU) -Wl,-Map=siboot.map -Wl,--section-start=.text=$(BOOTSTART)
 HEXFILE=siboot.hex
 AVRDUDE=avrdude
-AVRDUDE_CPU=m8
-#AVRDUDE_CPU=m88
+AVRDUDE_CPU=m168
 
 OBJS=main.o n64_isr.o
 
@@ -31,33 +30,36 @@ siboot.hex: siboot.elf
 	avr-size siboot.elf
 
 #
-# FUSE low byte
+# Extended byte: 0xF9
 #
-# 7: BODLEVEL -> 0  (Reset threshold: 3.7 ~ 4.5)
-# 6: BODEN    -> 0  (Enabled)
-# 5: SUT1     -> 0
-# 4: SUT2     -> 1
-# 3: CKSEL3   -> 1
-# 2: CKSEL2   -> 1
-# 1: CKSEL1   -> 1
-# 0: CKSEL0   -> 1
+# - - - - - BOOTSZ1 BOOTSZ0 BOOTRST
+# 0 0 0 0 0    0       0       0
 #
-# FUSE high byte
+# Boot size: 1024 words
+# Reset into bootloader
 #
-# 7: RSTDISBL -> 1
-# 6: WDTON    -> 1
-# 5: SPIEN    -> 0
-# 4: CKOPT    -> 1
-# 3: EESAVE   -> 1
+EFUSE=0x00
+
 #
-# 2: BOOTSZ1  -> 0
-# 1: BOOTSZ0  -> 0
-# 0: BOOTRST  -> 0
+# Low fuse byte
 #
-# 1024 words bootloader
+# CKDIV8	CKOUT	SUT1	SUT0	CKSEL[4]
+#   1         1      1       0
+#
+LFUSE=0xD7
+
+# High fuse byte
+#
+# RSTDISBL	DWEN	SPIEN	WDTON	EESAVE	BODLEVEL[3]
+#   1        1         0      1       1         100
+#
+# BOD level = 4.1 to 4.5 volt
+HFUSE=0xDC
+
+
 
 fuse:
-	$(AVRDUDE) -p $(AVRDUDE_CPU) -e -P usb -c avrispmkII -Uhfuse:w:0xd8:m -Ulfuse:w:0x1f:m -B 20.0 -F
+	$(AVRDUDE) -p $(AVRDUDE_CPU) -e -P usb -c avrispmkII -Uefuse:w:$(EFUSE):m -Uhfuse:w:$(HFUSE):m -Ulfuse:w:$(LFUSE):m -B 20.0 -F
 
 flash: $(HEXFILE)
 	$(AVRDUDE) -p $(AVRDUDE_CPU) -P usb -c avrispmkII -Uflash:w:$(HEXFILE) -B 1.0 -F
