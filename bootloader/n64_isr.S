@@ -563,6 +563,14 @@ lp_send1_3us:
 	rjmp send_next_bit
 
 send_stop:
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
 	; STOP BIT
 	sbi IO_DDRD, DATA_BIT ; Pull low for stop bit
 	ldi r20, 4
