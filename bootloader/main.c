@@ -3,6 +3,7 @@
 #include <avr/interrupt.h>
 #include <avr/boot.h>
 #include <avr/pgmspace.h>
+#include <util/delay.h>
 #include "../compat.h"
 #include "n64_isr.h"
 
@@ -14,6 +15,18 @@
 static volatile unsigned char state;
 static volatile unsigned char pagebuf[PAGE_SIZE];
 static volatile unsigned short pageaddr;
+static volatile unsigned char app_installed;
+static volatile unsigned char stay_in_bootloader;
+
+#ifdef WITH_LED
+#define LED_ON()		PORTB |= 1<<PB1
+#define LED_OFF()		PORTB &= ~(1<<PB1)
+#define LED_TOGGLE()	PORTB ^= 1<<PB1
+#else
+#define LED_ON()
+#define LED_OFF()
+#define LED_TOGGLE()
+#endif
 
 static void boot_eraseall(void)
 {
@@ -125,7 +138,7 @@ unsigned char n64_rx_callback(unsigned char len)
 						return 1;
 					}
 
-					addr = g_n64_buf[3] * 32L;
+					addr = block_id * 32L;
 					page_part = block_id % (PAGE_SIZE/32);
 
 					memcpy((void*)pagebuf+page_part*32, (void*)g_n64_buf+4, 32);
@@ -137,18 +150,16 @@ unsigned char n64_rx_callback(unsigned char len)
 						// takes time so it's done in the main loop.
 						g_n64_buf[0] = 0x00; // Ack
 						g_n64_buf[1] = 0x01; // Need to poll for busy state
-						g_n64_buf[2] = pageaddr >> 8;
-						g_n64_buf[3] = pageaddr;
+						g_n64_buf[2] = block_id >> 8;
+						g_n64_buf[3] = block_id;
 						state = STATE_WRITEPAGE;
 						return 4;
 					}
 
 					g_n64_buf[0] = 0x00; // Ack
 					g_n64_buf[1] = 0x00; // No need to poll for busy state.
-					addr /= PAGE_SIZE;
-					addr *= PAGE_SIZE;
-					g_n64_buf[2] = pageaddr >> 8;
-					g_n64_buf[3] = pageaddr;
+					g_n64_buf[2] = block_id >> 8;
+					g_n64_buf[3] = block_id;
 					return 4;
 				}
 				break;
@@ -165,6 +176,20 @@ unsigned char n64_rx_callback(unsigned char len)
 				g_n64_buf[0] = 0x00; // Will do
 				state = STATE_START_APP;
 				return 1;
+
+			case 0xff: // Enter bootloader. This *is* the bootloader, so it means stay in it!
+				// The bootloader listen to commands for 50ms before starting the application
+				// (if detected as installed). That's where you would send the command.
+				//
+				// Useful if the application is corrupted and sending a command to jump
+				// back to the bootloader does not work.
+				//
+				// Also, contrary to the application, the bootloader answers the command
+				// so this serves as a handshake indicating that the bootloader is started
+				// and ready for orders.
+				stay_in_bootloader = 1;
+				g_n64_buf[0] = 0x00;
+				return 1;
 		}
 	}
 
@@ -174,6 +199,7 @@ unsigned char n64_rx_callback(unsigned char len)
 static void startApp(void)
 {
 	cli();
+	LED_OFF();
 
 #ifdef AT168_COMPATIBLE
 	MCUCR = (1<<IVCE);
@@ -188,8 +214,40 @@ static void startApp(void)
 					"ijmp\n");
 }
 
+static char checkAppInstalled(void)
+{
+	unsigned char buf[4];
+	unsigned char b=0, e=0;
+	cli();
+
+	/* 1) Check for an application reset vector. This is what gets erased first when updating.
+	 * (see boot_eraseall() above) and therefore, if erasure was interrupted and only the beginning
+	 * of the application is gone, we will know. */
+	memcpy_PF(buf, (uint_farptr_t)0x0000, 4);
+	if (	(buf[0] != 0xFF) ||
+			(buf[1] != 0xFF) ||
+			(buf[2] != 0xFF) ||
+			(buf[3] != 0xFF)	) {
+		b = 1;
+	}
+
+	/* 2) Check for the marker at the end of the application section. This is written at the end,
+	 * so if programming is interrupted, the marker is absent. */
+	memcpy_PF(buf, (uint_farptr_t)(BOOTSTART-4), 4);
+	if (	(buf[0] == 0x12) &&
+			(buf[1] == 0x34) &&
+			(buf[2] == 0x56) &&
+			(buf[3] == 0x78)) {
+		e = 1;
+	}
+
+	return b && e;
+}
+
 int main(void)
 {
+	unsigned long counter = 0;
+
 	// PORTD2 is the N64 data signal.
 	// Pullup resistors on all other signals.
 	//
@@ -204,8 +262,8 @@ int main(void)
 	PORTC=0xff;
 
 #ifdef WITH_LED
-	PORTB |= (1<<PB1);
-	DDRB |= 1<<PB1;
+	DDRB |= (1<<DDB1);
+	LED_OFF();
 #endif
 
 #ifdef AT168_COMPATIBLE
@@ -232,7 +290,14 @@ asm volatile(
 	GICR |= (1<<INT0);
 #endif
 
+	app_installed = checkAppInstalled();
 	sei();
+
+	_delay_ms(50);
+
+	if (app_installed && !stay_in_bootloader) {
+		startApp();
+	}
 
 	while(1)
 	{
@@ -258,6 +323,16 @@ asm volatile(
 				startApp(); // If all is good, won't return.
 				state = STATE_IDLE;
 				break;
+		}
+
+		if (!app_installed) {
+			counter++;
+			if (counter > 150000) {
+				LED_TOGGLE();
+				counter = 0;
+			}
+		} else {
+			LED_ON();
 		}
 	}
 
