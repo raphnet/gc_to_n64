@@ -47,6 +47,7 @@
 #define DEBUG_LOW()		do { PORTD &= ~(1); } while(0)
 #define DEBUG_HIGH()	do { PORTD |= 1; } while(0)
 
+void enter_bootloader(void);
 
 Gamepad *gcpad;
 unsigned char gc_report[GC_REPORT_SIZE];
@@ -725,11 +726,14 @@ unsigned char long_command_handler(unsigned char len)
 					return len;
 
 				case 0x01: // Get info
-					memset(g_n64_buf, 0, sizeof(g_n64_buf));
+					memset((void*)g_n64_buf, 0, sizeof(g_n64_buf));
 					g_n64_buf[0] = 0; // Isbootloader? No.
 					g_n64_buf[1] = g_eeprom_data.defmap;
 					g_n64_buf[2] = g_eeprom_data.deadzone_enabled;
 					g_n64_buf[3] = g_eeprom_data.old_v1_5_conversion;
+#ifdef AT168_COMPATIBLE
+					g_n64_buf[9] = 1; // Upgradable
+#endif
 					strcpy((void*)(g_n64_buf+10), VERSION_STR);
 					return 10 + strlen(VERSION_STR) + 1;
 
@@ -761,6 +765,11 @@ unsigned char long_command_handler(unsigned char len)
 						}
 					}
 					break;
+#ifdef AT168_COMPATIBLE
+				case 0xff:
+					enter_bootloader();
+					break;
+#endif
 			}
 		}
 	}
@@ -969,4 +978,10 @@ wait_for_controller:
 
 }
 
-
+void enter_bootloader(void)
+{
+	cli();
+	// Make sure timer interrupt is not kept
+	timerIntOff();
+	asm volatile("ijmp" :: "z" (0x1C00));
+}
