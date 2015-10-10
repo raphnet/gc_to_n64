@@ -6,11 +6,12 @@ See gpl.txt for details.
 
 -= Relase history =-
 
-September 28, 2015 : Version 1.6
-    - Improved joystick value conversion (the old behaviour is available via menu option).
-    - N64 communication code improvements (now answers as fast as an official controller).
-    - Add Atmega168 support
-	- Add visual buzzer (simple LED) support
+October 10, 2015 : Version 2.0
+    - Now built for Atmega168 by default. Old makefile for Atmega8 is still available.
+	- Add a bootloader (Atmega168 only) for software updates.
+    - N64 communication code improvements (more reliable. Fixes the F-Zero X bug!)
+    - Improved joystick value conversion (the old behaviour is available via a menu option).
+	- Add visual buzzer (simple LED) support. (default for Atmega168)
     - Created a flowchart of the menu
 
 March 15, 2015 : Version 1.5.1

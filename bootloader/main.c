@@ -293,7 +293,9 @@ asm volatile(
 	app_installed = checkAppInstalled();
 	sei();
 
-	_delay_ms(50);
+	LED_ON();
+	_delay_ms(250);
+	LED_OFF();
 
 	if (app_installed && !stay_in_bootloader) {
 		startApp();
