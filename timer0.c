@@ -24,7 +24,7 @@
 
 static unsigned char t0_count;
 
-ISR(TIMER0_OVF_vect)
+ISR(TIMER0_OVF_vect, ISR_NOBLOCK)
 {
 	if (t0_count<60)
 		t0_count++;
