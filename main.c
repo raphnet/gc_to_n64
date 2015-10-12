@@ -47,6 +47,18 @@
 #define DEBUG_LOW()		do { PORTD &= ~(1); } while(0)
 #define DEBUG_HIGH()	do { PORTD |= 1; } while(0)
 
+#ifdef AT168_COMPATIBLE
+/* This is just a constant that will be in flash. The update tool will search
+ * the hexfile for this sequence. In not found, update won't take place. The
+ * goal is to prevent temporary bricking due to users using the wrong .hex.   */
+const char signature[] PROGMEM = "41d938a8-6f8a-11e5-a45e-001bfca3c593";
+
+/* This marker is used by the bootloader to protect against partial programming.
+ * Since programming is done with increasing addresses, if it is interrupted, this
+ * sequence at the end will be missing if interrupted. */
+const char endmarker[4] __attribute__((section(".endmarker")))  = { 0x12, 0x34, 0x56, 0x78 };
+#endif
+
 void enter_bootloader(void);
 
 Gamepad *gcpad;
@@ -388,6 +400,11 @@ int rmenu_do()
 
 		case EV_BTN_B:
 			toggle_old_v1_5_conversion();
+			break;
+
+		case EV_BTN_X:
+			eeprom_writeDefaults();
+			loadMappingId(0);
 			break;
 
 		default:

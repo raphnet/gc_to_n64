@@ -25,24 +25,29 @@ void eeprom_commit(void)
 	eeprom_write_block(&g_eeprom_data, (void*)0x00, sizeof(struct eeprom_data_struct));
 }
 
+static char magic[EEPROM_MAGIC_SIZE] = { 'G','C','2','N','6','4','v','7' };
+
+void eeprom_writeDefaults(void)
+{
+	memcpy(g_eeprom_data.magic, magic, EEPROM_MAGIC_SIZE);
+
+	g_eeprom_data.defmap = 0;
+	g_eeprom_data.deadzone_enabled = 0;
+	g_eeprom_data.old_v1_5_conversion = 0;
+
+	// This fill lets default mappings be empty (-1,-1 being the terminator)
+	memset(g_eeprom_data.appdata, 0xff, EEPROM_APPDATA_SIZE);
+
+	eeprom_commit();
+}
+
 int eeprom_init(void)
 {
-	char magic[EEPROM_MAGIC_SIZE] = { 'G','C','2','N','6','4','v','7' };
 	eeprom_read_block(&g_eeprom_data, (void*)0x00, sizeof(struct eeprom_data_struct));
 
 	/* Check for magic number */
 	if (memcmp(g_eeprom_data.magic, magic, EEPROM_MAGIC_SIZE)) {
-		memcpy(g_eeprom_data.magic, magic, EEPROM_MAGIC_SIZE);
-
-		g_eeprom_data.defmap = 0;
-		g_eeprom_data.deadzone_enabled = 0;
-		g_eeprom_data.old_v1_5_conversion = 0;
-
-		// This fill lets default mappings be empty (-1,-1 being the terminator)
-		memset(g_eeprom_data.appdata, 0xff, EEPROM_APPDATA_SIZE);
-
-		eeprom_commit();
-
+		eeprom_writeDefaults();
 		return 1;
 	}
 

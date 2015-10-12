@@ -18,6 +18,7 @@ struct eeprom_data_struct {
 
 extern struct eeprom_data_struct g_eeprom_data;
 void eeprom_commit(void);
+void eeprom_writeDefaults(void);
 
 /** \return 0 if init ok, 1 if corrupted (and fixed)
  */
