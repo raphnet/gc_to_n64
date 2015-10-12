@@ -5,8 +5,8 @@ LD=$(CC)
 VERSION=2.0
 CPU=atmega168
 CFLAGS=-Wall -mmcu=$(CPU) -DF_CPU=16000000L -Os -DVISUAL_BUZZER -DVERSION_STR=\"$(VERSION)\"
-LDFLAGS=-mmcu=$(CPU) -Wl,-Map=gc_to_n64.map
-HEXFILE=gc_to_n64.hex
+LDFLAGS=-mmcu=$(CPU) -Wl,-Map=gc_to_n64.map -Wl,--section-start=.endmarker=0x37fc
+HEXFILE=gc_to_n64b.hex
 AVRDUDE=avrdude
 AVRDUDE_CPU=m168
 
@@ -15,14 +15,21 @@ OBJS=main.o gamecube.o n64_isr.o mapper.o gamecube_mapping.o n64_mapping.o buzze
 all: $(HEXFILE)
 
 clean:
-	rm -f gc_to_n64.elf gc_to_n64.hex gc_to_n64.map $(OBJS)
+	rm -f gc_to_n64.elf gc_to_n64_tmp.hex $(HEXFILE) gc_to_n64.map $(OBJS)
+	$(MAKE) -C bootloader clean
 
 gc_to_n64.elf: $(OBJS)
 	$(LD) $(OBJS) $(LDFLAGS) -o gc_to_n64.elf
 
-gc_to_n64.hex: gc_to_n64.elf
-	avr-objcopy -j .data -j .text -O ihex gc_to_n64.elf gc_to_n64.hex
+gc_to_n64_tmp.hex: gc_to_n64.elf
+	avr-objcopy -j .data -j .text -j .endmarker -O ihex gc_to_n64.elf gc_to_n64_tmp.hex
 	avr-size gc_to_n64.elf
+
+bootloader/siboot.hex:
+	$(MAKE) -C bootloader
+
+$(HEXFILE): gc_to_n64_tmp.hex bootloader/siboot.hex
+	srec_cat gc_to_n64_tmp.hex -I bootloader/siboot.hex -I -o $@ -I
 
 #
 # Extended byte: 0xF9
