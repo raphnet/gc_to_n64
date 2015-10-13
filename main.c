@@ -64,6 +64,10 @@ void enter_bootloader(void);
 Gamepad *gcpad;
 unsigned char gc_report[GC_REPORT_SIZE];
 
+// When non-zero, triggers saving the current mapping to specified slot
+// in the main loop.
+static volatile unsigned char g_todo_save_mapping;
+
 struct mapping_entry current_mapping[MAP_GC_NONE + 2];
 
 struct mapping_entry gamecube_to_n64_default_mapping[MAP_GC_NONE + 2] = {
@@ -118,7 +122,7 @@ int loadMappingId(int id)
 		case 0:
 			// default mapping used.
 			break;
-		
+
 		case 1:
 		case 2:
 		case 3:
@@ -755,15 +759,19 @@ unsigned char long_command_handler(unsigned char len)
 					return 10 + strlen(VERSION_STR) + 1;
 
 				case 0x02: // Get mapping
-					if (len >= 3) {
+					if (len >= 4) {
 						int id = g_n64_buf[2];
 						int chunk = g_n64_buf[3];
 						unsigned short mapping_size = sizeof(current_mapping);
 
-						if (id >= 1 && id <= 4) {
+						if (id >= 0 && id <= 4) {
 							unsigned char *mapping_pointer;
 
-							mapping_pointer = g_eeprom_data.appdata + (sizeof(current_mapping) * (id-1));
+							if (id) {
+								mapping_pointer = g_eeprom_data.appdata + (sizeof(current_mapping) * (id-1));
+							} else {
+								mapping_pointer = (unsigned char*)&current_mapping[0];
+							}
 
 							if (chunk == 0) {
 								g_n64_buf[0] = mapping_size & 0xff;
@@ -782,6 +790,56 @@ unsigned char long_command_handler(unsigned char len)
 						}
 					}
 					break;
+
+				case 0x03: // Set mapping
+					if (len > 3) {
+						int chunk = g_n64_buf[2];
+						unsigned char *mapping_pointer;
+
+						mapping_pointer = (unsigned char*)&current_mapping[0];
+						if (chunk == 1) {
+							mapping_pointer += 32;
+						} else {
+							memset(mapping_pointer, 0xff, sizeof(current_mapping));
+						}
+
+						memcpy(	mapping_pointer, (void*)(g_n64_buf+3), len-4 );
+						return 1;
+					}
+					break;
+
+				case 0x04: // Save current mapping
+					if (len > 2) {
+						int id = g_n64_buf[2];
+
+						if (id < 1 || id > 4) {
+							g_n64_buf[0] = 0x01; // NACK (out of range)
+							return 1;
+						}
+
+						// This need to be done in the main loop. It takes
+						// too much time and the host may timeout waiting
+						// for an answer.
+						//
+						// Setting this to non-zero triggers a write. It gets
+						// cleared back to 0 once it's done.
+						//
+						// The caller should poll the adapter for business
+						// before sending this.
+						g_todo_save_mapping = id;
+						g_n64_buf[0] = 0x00;
+						return 1; // ACK
+					}
+					break;
+
+				case 0xf9:
+					if (g_todo_save_mapping) {
+						g_n64_buf[0] = 1;
+					} else {
+						g_n64_buf[0] = 0;
+					}
+					return 1;
+
 #ifdef AT168_COMPATIBLE
 				case 0xff:
 					enter_bootloader();
@@ -944,6 +1002,11 @@ wait_for_controller:
 		if (n64_got_command) {
 			n64_got_command = 0;
 			sync_master_polled_us();
+		}
+
+		if (g_todo_save_mapping) {
+			saveCurrentMappingTo(g_todo_save_mapping);
+			g_todo_save_mapping = 0;
 		}
 
 		if (sync_may_poll()) {	
