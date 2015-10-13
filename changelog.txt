@@ -4,6 +4,7 @@ October 10, 2015 : Version 2.0
     - N64 communication code improvements (more reliable. Fixes the F-Zero X bug!)
     - Improved joystick value conversion (the old behaviour is available via a menu option).
 	- Add a reset to factory defaults function.
+	- Add mapping load/save through the N64 interface support
 	- Add visual buzzer (simple LED) support. (default for Atmega168)
     - Created a flowchart of the menu
 
