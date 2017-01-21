@@ -1,3 +1,6 @@
+Next : Version 2.1
+    - Set lock bits to protect bootloader from erasure
+
 October 10, 2015 : Version 2.0
     - Now built for Atmega168 by default. Old makefile for Atmega8 is still available.
 	- Add a bootloader (Atmega168 only) for software updates.

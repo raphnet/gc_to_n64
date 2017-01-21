@@ -2,7 +2,7 @@ CC=avr-gcc
 AS=$(CC)
 LD=$(CC)
 
-VERSION=2.0
+VERSION=2.1
 CPU=atmega168
 CFLAGS=-Wall -mmcu=$(CPU) -DF_CPU=16000000L -Os -DVISUAL_BUZZER -DVERSION_STR=\"$(VERSION)\"
 LDFLAGS=-mmcu=$(CPU) -Wl,-Map=gc_to_n64.map -Wl,--section-start=.endmarker=0x37fc
@@ -52,32 +52,19 @@ LFUSE=0xD7
 # BOD level = 4.1 to 4.5 volt
 HFUSE=0xDC
 
+
 #
-# FUSE low byte
+# Lock bits
 #
-# 7: BODLEVEL -> 0  (Reset threshold: 3.7 ~ 4.5)
-# 6: BODEN    -> 0  (Enabled)
-# 5: SUT1     -> 0
-# 4: SUT2     -> 1
-# 3: CKSEL3   -> 1
-# 2: CKSEL2   -> 1
-# 1: CKSEL1   -> 1
-# 0: CKSEL0   -> 1
+# - - BLB12 BLB11 BLB02 BLB01 LB2 LB1
+# 0 0   1    0      1     1    1   1
 #
-# FUSE high byte
 #
-# 7: RSTDISBL -> 1
-# 6: WDTON    -> 1
-# 5: SPIEN    -> 0
-# 4: CKOPT    -> 1
-# 3: EESAVE   -> 1
-# 2: BOOTSZ1  -> 0
-# 1: BOOTSZ0  -> 0
-# 0: BOOTRST  -> 1
-#
+LOCK=0x2F
 
 fuse:
 	$(AVRDUDE) -p $(AVRDUDE_CPU) -P usb -c avrispmkII -Uefuse:w:$(EFUSE):m -Uhfuse:w:$(HFUSE):m -Ulfuse:w:$(LFUSE):m -B 20.0 -F
+	$(AVRDUDE) -p $(AVRDUDE_CPU) -P usb -c avrispmkII -Ulock:w:$(LOCK):m
 
 flash: $(HEXFILE)
 	$(AVRDUDE) -p $(AVRDUDE_CPU) -P usb -c avrispmkII -Uflash:w:$(HEXFILE) -B 1.0 -F
