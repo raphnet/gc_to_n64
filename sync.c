@@ -24,7 +24,7 @@
 /* Forces the old behaviour which means a stable time distance
  * between N64 poll and our Gamecube * poll. Sometimes useful
  * when debugging with an oscilloscope. */
-//#define OLD_MODE
+#define OLD_MODE
 
 /*
  * - Introduction

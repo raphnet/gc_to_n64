@@ -2,7 +2,7 @@ CC=avr-gcc
 AS=$(CC)
 LD=$(CC)
 
-VERSION=2.1
+VERSION=2.1-test1
 CPU=atmega168
 CFLAGS=-Wall -mmcu=$(CPU) -DF_CPU=16000000L -Os -DVISUAL_BUZZER -DVERSION_STR=\"$(VERSION)\"
 LDFLAGS=-mmcu=$(CPU) -Wl,-Map=gc_to_n64.map -Wl,--section-start=.endmarker=0x37fc
