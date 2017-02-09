@@ -13,6 +13,7 @@ struct eeprom_data_struct {
 	unsigned char defmap;
 	unsigned char deadzone_enabled;
 	unsigned char old_v1_5_conversion;
+	unsigned char wide_conversion;
 	unsigned char appdata[EEPROM_APPDATA_SIZE];
 };
 
@@ -23,6 +24,11 @@ void eeprom_writeDefaults(void);
 /** \return 0 if init ok, 1 if corrupted (and fixed)
  */
 int eeprom_init(void);
+
+// These make a change and commit
+void toggle_old_v1_5_conversion(void);
+void toggleDeadzone(void);
+void setDefaultMapping(int id);
 
 #endif // _eeprom_h__
 

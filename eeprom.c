@@ -54,3 +54,21 @@ int eeprom_init(void)
 	return 0;
 }
 
+void toggle_old_v1_5_conversion(void)
+{
+	g_eeprom_data.old_v1_5_conversion = !g_eeprom_data.old_v1_5_conversion;
+	eeprom_commit();
+}
+
+void toggleDeadzone(void)
+{
+	g_eeprom_data.deadzone_enabled = !g_eeprom_data.deadzone_enabled;
+	eeprom_commit();
+}
+
+void setDefaultMapping(int id)
+{
+	g_eeprom_data.defmap = id;
+	eeprom_commit();
+}
+

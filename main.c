@@ -21,10 +21,11 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <avr/pgmspace.h>
-
+#include "main.h"
 #include "buzzer.h"
 #include "timer0.h"
 #include "lut.h"
+#include "menu.h"
 
 #include "gamecube.h"
 
@@ -61,7 +62,7 @@ const char endmarker[4] __attribute__((section(".endmarker")))  = { 0x12, 0x34, 
 
 void enter_bootloader(void);
 
-Gamepad *gcpad;
+Gamepad *g_gcpad;
 unsigned char gc_report[GC_REPORT_SIZE];
 
 // When non-zero, triggers saving the current mapping to specified slot
@@ -137,400 +138,6 @@ int loadMappingId(int id)
 	return 0;
 }
 
-void toggle_old_v1_5_conversion(void)
-{
-	g_eeprom_data.old_v1_5_conversion = !g_eeprom_data.old_v1_5_conversion;
-	eeprom_commit();
-}
-
-void toggleDeadzone(void)
-{
-	g_eeprom_data.deadzone_enabled = !g_eeprom_data.deadzone_enabled;
-	eeprom_commit();
-}
-
-void setDefaultMapping(int id)
-{
-	g_eeprom_data.defmap = id;
-	eeprom_commit();
-}
-
-#define EV_BTN_A		0x001
-#define EV_BTN_B		0x002
-#define EV_BTN_X		0x004
-#define EV_BTN_Y		0x008
-#define EV_BTN_Z		0x010
-#define EV_BTN_L		0x020
-#define EV_BTN_R		0x040
-#define EV_BTN_D_UP		0x080
-#define EV_BTN_D_DOWN	0x100	
-#define EV_BTN_D_LEFT	0x200
-#define EV_BTN_D_RIGHT	0x400
-#define EV_BTN_START	0x800
-
-#define CODE_BASE	4
-
-static void gc_report_to_mapping(const unsigned char gcr[GC_REPORT_SIZE], struct mapping_controller_unit *gcs);
-
-static void waitStartRelease(void)
-{
-	while(1)
-	{
-		gcpad->update(GAMECUBE_UPDATE_NORMAL);
-		gcpad->buildReport(gc_report);
-		gc_report_to_mapping(gc_report, g_gamecube_status);
-
-		if (!g_gamecube_status[MAP_GC_BTN_START].value)
-			break;
-
-		_delay_ms(16);
-	}
-}
-
-static int getEvent(void)
-{
-	static int status = 0;
-	int b;
-	while(1)
-	{
-		_delay_ms(16);
-		gcpad->update(GAMECUBE_UPDATE_NORMAL);
-		if (gcpad->changed()) {
-			int now = 0;
-			// Read the gamepad	
-			gcpad->buildReport(gc_report);				
-				
-			// Convert the data we got from the gamepad reader
-			// to a mapping structure.
-			gc_report_to_mapping(gc_report, g_gamecube_status);
-
-			if (g_gamecube_status[MAP_GC_BTN_A].value)
-				now |= EV_BTN_A;	
-			if (g_gamecube_status[MAP_GC_BTN_B].value)
-				now |= EV_BTN_B;	
-			if (g_gamecube_status[MAP_GC_BTN_X].value)
-				now |= EV_BTN_X;	
-			if (g_gamecube_status[MAP_GC_BTN_Y].value)
-				now |= EV_BTN_Y;	
-			if (g_gamecube_status[MAP_GC_BTN_Z].value)
-				now |= EV_BTN_Z;	
-			if (g_gamecube_status[MAP_GC_BTN_L].value)
-				now |= EV_BTN_L;	
-			if (g_gamecube_status[MAP_GC_BTN_R].value)
-				now |= EV_BTN_R;	
-			if (g_gamecube_status[MAP_GC_BTN_DPAD_UP].value)
-				now |= EV_BTN_D_UP;	
-			if (g_gamecube_status[MAP_GC_BTN_DPAD_DOWN].value)
-				now |= EV_BTN_D_DOWN;	
-			if (g_gamecube_status[MAP_GC_BTN_DPAD_LEFT].value)
-				now |= EV_BTN_D_LEFT;
-			if (g_gamecube_status[MAP_GC_BTN_DPAD_RIGHT].value)
-				now |= EV_BTN_D_RIGHT;
-			if (g_gamecube_status[MAP_GC_BTN_START].value)
-				now |= EV_BTN_START;
-	
-			for (b=1; b<=EV_BTN_START; b<<=1) {
-				if ((now & b) != (status & b)) {
-					if (now & b) {
-						status = now;
-						return b;
-					}
-				}
-			}
-			status = now;
-		}
-	}
-}
-
-int receivePair(int initial_event, int *input, int *output)
-{
-	int ev = initial_event;
-	int *target = input;
-	unsigned char value = 0x80;
-
-	// Code [ABXY] Z [ABXY] L
-	//      input    output
-	//
-	// Z : Input/output separator
-	// L : Pair end.
-	//
-
-	if (initial_event==EV_BTN_L) {
-		if (*input != -1) {
-			// assign next trigger to same output
-			(*input)++;
-			return 0;
-		}
-		return -1;
-	}
-
-	goto first_ev;
-
-	while(1)
-	{
-		ev = getEvent();
-first_ev:
-
-		switch (ev)
-		{
-			case EV_BTN_Z:
-				if (value != 0x80) {
-					*target = value;
-				} else {
-					if (*input != -1) {
-						(*input)++;
-					} else {
-						return -1; // Prior explicit input id required
-					}
-				}
-				target = output;
-				value = 0x80;
-				break;
-
-			case EV_BTN_A:
-				value *= CODE_BASE;
-				break;
-			case EV_BTN_B:
-				value *= CODE_BASE;
-				value += 1;
-				break;
-			case EV_BTN_X:
-				value *= CODE_BASE;
-				value += 2;
-				break;
-			case EV_BTN_Y:			
-				value *= CODE_BASE;
-				value += 3;
-				break;
-
-			case EV_BTN_L:
-				if (target == input) {
-					// should have got at least a 'Z'
-					return -1;
-				}
-				if (value != 0x80) {
-					*target = value;
-					return 0;
-				}
-				// target omitted, left as-is
-				return 0;
-
-			case EV_BTN_START:
-				return -1; // abort
-		}
-
-	}
-
-	return 0;
-}
-
-int set_default_menu()
-{
-	int ev;
-
-	blips(1);
-	ev = getEvent();
-
-	switch(ev)
-	{
-		case EV_BTN_D_UP:
-			setDefaultMapping(1);
-			return 0;
-
-		case EV_BTN_D_DOWN:
-			setDefaultMapping(2);
-			return 0;
-
-		case EV_BTN_D_LEFT:
-			setDefaultMapping(3);
-			return 0;
-
-		case EV_BTN_D_RIGHT:
-			setDefaultMapping(4);
-			return 0;
-
-		case EV_BTN_START:
-			setDefaultMapping(0);
-			return 0;
-
-		default:
-			return -1;
-	}
-
-	return 0;
-
-}
-
-// R pressed. Next steps:
-//
-// Dpad direction : Save to corresponding slots and exit.
-// Start : Load default mapping and exit.
-int rmenu_do()
-{
-	int ev;
-
-	blips(1);
-	ev = getEvent();
-
-	switch(ev)
-	{
-		case EV_BTN_D_UP:
-			saveCurrentMappingTo(1);
-			break;
-
-		case EV_BTN_D_DOWN:
-			saveCurrentMappingTo(2);
-			break;
-
-		case EV_BTN_D_LEFT:
-			saveCurrentMappingTo(3);
-			// load stored config id X
-			break;
-
-		case EV_BTN_D_RIGHT:
-			saveCurrentMappingTo(4);
-			break;
-
-		case EV_BTN_START:
-			loadMappingId(0);
-			break;
-
-		case EV_BTN_Z:
-			toggleDeadzone();
-			break;
-
-		case EV_BTN_L:
-			return set_default_menu();
-
-		case EV_BTN_B:
-			toggle_old_v1_5_conversion();
-			break;
-
-		case EV_BTN_X:
-			eeprom_writeDefaults();
-			loadMappingId(0);
-			break;
-
-		default:
-			return -1;
-	}
-
-	return 0;
-}
-
-void menumain()
-{
-	int ev, res;
-	unsigned char sreg;
-	int input=-1, output=-1;
-	int firstMappingPairInSession = 1;
-	sreg = SREG;
-	cli();
-
-	// re-init buzzer (sync uses the same timer)
-	buzzer_init();
-#ifndef VISUAL_BUZZER
-	blips(5);
-#else
-	buzzer_led_invert(1);
-	buzz(0);
-#endif
-
-	waitStartRelease();
-
-	while(1)
-	{
-
-		ev = getEvent();
-
-		switch(ev)
-		{
-			case EV_BTN_D_UP:
-				res = loadMappingId(1);
-				if (res==-1)
-					goto error;
-
-				goto menu_done;
-
-			case EV_BTN_D_DOWN:
-				res = loadMappingId(2);
-				if (res==-1)
-					goto error;
-
-				goto menu_done;
-
-			case EV_BTN_D_LEFT:
-				res = loadMappingId(3);
-				if (res==-1)
-					goto error;
-
-				goto menu_done;
-
-			case EV_BTN_D_RIGHT:
-				res = loadMappingId(4);
-				if (res==-1)
-					goto error;
-
-				goto menu_done;
-
-			case EV_BTN_START:
-				goto menu_done;
-
-			case EV_BTN_R:
-				res = rmenu_do();
-				if (res==-1)
-					goto error;
-
-				goto menu_done;
-
-			case EV_BTN_Z:
-			case EV_BTN_A:
-			case EV_BTN_B:
-			case EV_BTN_X:
-			case EV_BTN_Y:
-			case EV_BTN_L:
-				res = receivePair(ev, &input, &output);
-				if (res==-1) {
-					goto error;
-				}
-
-				if (input == -1 || output == -1) {
-					goto error;
-				}
-
-				if (firstMappingPairInSession) {
-					// When a new code is entered, we must start
-					// from a clean copy of the default mapping. Otherwise
-					// the changes are cumulative.
-					loadMappingId(0);
-					firstMappingPairInSession = 0;
-				}
-
-				mapper_change_mapping_entry(current_mapping, input, output);
-				blips(1);
-				break;
-		}
-	}
-
-error:
-	buzz_error();
-
-	// re-init sync. Buzzer uses the same timer...
-	sync_init();
-
-	SREG = sreg;
-	return;
-
-menu_done:
-	buzzer_led_invert(0);
-	blips(3);
-
-	// re-init sync. Buzzer uses the same timer...
-	sync_init();
-
-
-	SREG = sreg;
-}
 
 int domenu(struct mapping_controller_unit *gcs)
 {
@@ -562,178 +169,6 @@ void byteTo8Bytes(unsigned char val, unsigned char volatile *dst)
 	} while(c);
 }
 
-static char gc_x_origin = 0;
-static char gc_y_origin = 0;
-
-static void setOriginsFromReport(const unsigned char gcr[GC_REPORT_SIZE])
-{
-	// Signed origin
-	gc_x_origin = gcr[0]^0x80;
-	gc_y_origin = gcr[1]^0x80;
-}
-
-/*
- * \return N64 axis data (unsigned)
- * */
-static int calb(char orig, unsigned char val)
-{
-	short tmp;
-	long mult = 26000; // V1.6
-	char dz=0;
-
-	if (g_eeprom_data.old_v1_5_conversion) {
-		mult = 25000;
-	}
-
-	if (g_eeprom_data.deadzone_enabled) {
-		dz = 12;
-		mult = 30000; // V1.6
-		if (g_eeprom_data.old_v1_5_conversion) {
-			mult = 29000;
-		}
-	}
-
-	tmp = (signed char)(val^0x80) - orig;
-
-	if (dz) {
-		if (tmp > 0) {
-			if (tmp < dz) {
-				tmp = 0;
-			} else {
-				tmp -= dz;
-			}
-		}
-		else if (tmp < 0) {
-			if (tmp > -dz) {
-				tmp = 0;
-			} else {
-				tmp += dz;
-			}
-		}
-	}
-
-	//tmp = tmp * 31000L / 32000L;
-	tmp = tmp * mult / 32000L;
-
-	if (tmp<=-127)
-		tmp = -127;
-
-	if (tmp>127)
-		tmp = 127;
-/*	
-	if (tmp<0) {
-		tmp = -((char)(pgm_read_byte(&correction_lut[tmp*-2])/2));
-	} else {
-		tmp = (char)(pgm_read_byte(&correction_lut[tmp*2])/2);
-	}
-*/
-	//   
-	//   Real N64 x axis
-	// -68 0 63
-	// -79 0 78
-	// -68 0 66
-	//
-
-	return tmp; // ((unsigned char)tmp ^ 0x80);
-}
-
-static void gamecubeXYtoN64(unsigned char x, unsigned char y, char *dst_x, char *dst_y)
-{
-	unsigned char abs_y, abs_x;
-	long sig_x, sig_y;
-	long sx, sy;
-	int n64_maxval = 80; // Version 1.6
-
-	// The lower, the stronger the correction. 32768 means null correction
-	//long l = 1700;
-	//long l = 16000;
-	long l = 256; // Version 1.6
-
-	if (g_eeprom_data.old_v1_5_conversion) {
-		// Provide a way to use the old parameters, in case
-		// it turns out the new values are not good.
-		l = 512;
-		n64_maxval = 127;
-	}
-
-	sig_x = calb(gc_x_origin, x);
-	sig_y = calb(gc_y_origin, y);
-
-	abs_y = abs(sig_y);
-	abs_x = abs(sig_x);
-
-	if (1) {
-		sx = sig_x + sig_x * abs_y / l;
-		sy = sig_y + sig_y * abs_x / l;
-	} else {
-		// Direct conversion (for testing. Not good for use, corners do not
-		// reach maximum values)
-		sx = sig_x;
-		sy = sig_y;
-	}
-
-	if (sx<=-n64_maxval)
-		sx = -n64_maxval;
-	if (sx>n64_maxval)
-		sx = n64_maxval;
-	if (sy<=-n64_maxval)
-		sy = -n64_maxval;
-	if (sy>n64_maxval)
-		sy = n64_maxval;
-
-	*dst_x = sx;
-	*dst_y = sy;
-}
-/*
-static unsigned char gamecubeXtoN64(unsigned char raw)
-{
-	return calb(gc_x_origin, raw);
-	//return ((char)raw) * 24000L / 32767L;
-}
-
-static unsigned char gamecubeYtoN64(unsigned char raw)
-{
-	return calb(gc_y_origin, raw);
-	//return ((char)raw) * 24000L / 32767L;
-}
-*/
-static void gc_report_to_mapping(const unsigned char gcr[GC_REPORT_SIZE], struct mapping_controller_unit *gcs)
-{
-	gcs[MAP_GC_BTN_A].value = gcr[6] & 0x10;
-	gcs[MAP_GC_BTN_B].value = gcr[6] & 0x08;
-	gcs[MAP_GC_BTN_Z].value = gcr[6] & 0x80;
-	gcs[MAP_GC_BTN_START].value = gcr[6] & 0x01;
-	gcs[MAP_GC_BTN_L].value = gcr[6] & 0x20;
-	gcs[MAP_GC_BTN_R].value = gcr[6] & 0x40;
-
-	gcs[MAP_GC_AXB_C_UP].value = gcr[3] ^ 0x80;
-	gcs[MAP_GC_AXB_C_DOWN].value = gcr[3] ^ 0x80;
-	gcs[MAP_GC_AXB_C_LEFT].value = gcr[2] ^ 0x80;
-	gcs[MAP_GC_AXB_C_RIGHT].value = gcr[2] ^ 0x80;
-
-	gcs[MAP_GC_BTN_DPAD_UP].value = gcr[7] & 0x01;
-	gcs[MAP_GC_BTN_DPAD_DOWN].value = gcr[7] & 0x02;
-	gcs[MAP_GC_BTN_DPAD_LEFT].value = gcr[7] & 0x08;
-	gcs[MAP_GC_BTN_DPAD_RIGHT].value = gcr[7] & 0x04;
-
-	gamecubeXYtoN64(gcr[0], gcr[1], &gcs[MAP_GC_AXIS_LEFT_RIGHT].value, &gcs[MAP_GC_AXIS_UP_DOWN].value);
-//	gcs[MAP_GC_AXIS_LEFT_RIGHT].value = gamecubeXtoN64(gcr[0]);
-//	gcs[MAP_GC_AXIS_UP_DOWN].value = gamecubeYtoN64(gcr[1]);
-	
-	gcs[MAP_GC_BTN_X].value = gcr[6] & 0x04;
-	gcs[MAP_GC_BTN_Y].value = gcr[6] & 0x02;
-
-	gcs[MAP_GC_AXB_JOY_UP].value = gcs[MAP_GC_AXIS_UP_DOWN].value;
-	gcs[MAP_GC_AXB_JOY_DOWN].value = gcs[MAP_GC_AXIS_UP_DOWN].value;
-	gcs[MAP_GC_AXB_JOY_LEFT].value = gcs[MAP_GC_AXIS_LEFT_RIGHT].value;
-	gcs[MAP_GC_AXB_JOY_RIGHT].value = gcs[MAP_GC_AXIS_LEFT_RIGHT].value;
-
-	gcs[MAP_GC_AXB_L_SLIDER].value = gcr[4] ^ 0x80;
-	gcs[MAP_GC_AXB_R_SLIDER].value = gcr[5] ^ 0x80;
-
-	gcs[MAP_GC_AXIS_C_LEFT_RIGHT].value = gcs[MAP_GC_AXB_C_LEFT].value;
-	gcs[MAP_GC_AXIS_C_UP_DOWN].value = gcs[MAP_GC_AXB_C_UP].value;
-}
 
 #define IS_ACTIVE(a) ((a).value != (a).def)
 
@@ -752,6 +187,7 @@ unsigned char long_command_handler(unsigned char len)
 					g_n64_buf[1] = g_eeprom_data.defmap;
 					g_n64_buf[2] = g_eeprom_data.deadzone_enabled;
 					g_n64_buf[3] = g_eeprom_data.old_v1_5_conversion;
+					g_n64_buf[4] = g_eeprom_data.wide_conversion;
 #ifdef AT168_COMPATIBLE
 					g_n64_buf[9] = 1; // Upgradable
 #endif
@@ -913,7 +349,7 @@ int main(void)
 {
 	char res, read_fail_count = 0;
 
-	gcpad = gamecubeGetGamepad();
+	g_gcpad = gamecubeGetGamepad();
 
 
 	// PORTD2 is the N64 data signal.
@@ -966,7 +402,7 @@ int main(void)
 
 	timerStart();
 
-	gcpad->init();
+	g_gcpad->init();
 
 	DEBUG_HIGH();
 	_delay_ms(500);
@@ -975,12 +411,12 @@ int main(void)
 	 * keep trying. We need the initial read to use as origin
 	 * position. */
 wait_for_controller:
-	while (0 != (res = gcpad->update(GAMECUBE_UPDATE_ORIGIN))) {
+	while (0 != (res = g_gcpad->update(GAMECUBE_UPDATE_ORIGIN))) {
 		_delay_ms(16);
 	}
 	read_fail_count = 0;
 
-	gcpad->buildReport(gc_report);
+	g_gcpad->buildReport(gc_report);
 
 	// Learn the joystick origin to use
 	_delay_ms(16);
@@ -1012,7 +448,7 @@ wait_for_controller:
 		if (sync_may_poll()) {	
 			DEBUG_HIGH();
 			timerIntOff();		
-			res = gcpad->update(GAMECUBE_UPDATE_NORMAL);
+			res = g_gcpad->update(GAMECUBE_UPDATE_NORMAL);
 			timerIntOn();
 			DEBUG_LOW();
 
@@ -1026,10 +462,10 @@ wait_for_controller:
 				read_fail_count = 0;
 			}
 
-			if (gcpad->changed()) {
+			if (g_gcpad->changed()) {
 				DEBUG_HIGH();
 				// Read the gamepad	
-				gcpad->buildReport(gc_report);				
+				g_gcpad->buildReport(gc_report);				
 				
 				// Convert the data we got from the gamepad reader
 				// to a mapping structure.
