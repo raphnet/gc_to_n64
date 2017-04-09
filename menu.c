@@ -273,7 +273,7 @@ int rmenu_do()
 			return set_default_menu();
 
 		case EV_BTN_B:
-			toggle_old_v1_5_conversion();
+			cycle_conversion_mode();
 			break;
 
 		case EV_BTN_X:

@@ -187,7 +187,7 @@ unsigned char long_command_handler(unsigned char len)
 					g_n64_buf[1] = g_eeprom_data.defmap;
 					g_n64_buf[2] = g_eeprom_data.deadzone_enabled;
 					g_n64_buf[3] = g_eeprom_data.old_v1_5_conversion;
-					g_n64_buf[4] = g_eeprom_data.wide_conversion;
+					g_n64_buf[4] = g_eeprom_data.conversion_mode;
 #ifdef AT168_COMPATIBLE
 					g_n64_buf[9] = 1; // Upgradable
 #endif

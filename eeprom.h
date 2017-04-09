@@ -8,12 +8,18 @@
 //
 // 28 bytes per mapping
 
+#define CONVERSION_MODE_OLD_1v5		1
+#define CONVERSION_MODE_V2			2
+#define CONVERSION_MODE_EXTENDED	3
+
+#define CONVERSION_MAX			3
+
 struct eeprom_data_struct {
 	unsigned char magic[EEPROM_MAGIC_SIZE];
 	unsigned char defmap;
 	unsigned char deadzone_enabled;
 	unsigned char old_v1_5_conversion;
-	unsigned char wide_conversion;
+	unsigned char conversion_mode;
 	unsigned char appdata[EEPROM_APPDATA_SIZE];
 };
 
@@ -26,7 +32,8 @@ void eeprom_writeDefaults(void);
 int eeprom_init(void);
 
 // These make a change and commit
-void toggle_old_v1_5_conversion(void);
+void cycle_conversion_mode(void);
+
 void toggleDeadzone(void);
 void setDefaultMapping(int id);
 

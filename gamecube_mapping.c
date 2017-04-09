@@ -68,16 +68,14 @@ int calb(char orig, unsigned char val)
 	long mult = 26000; // V1.6
 	char dz=0;
 
-	if (!g_eeprom_data.wide_conversion) {
-		if (g_eeprom_data.old_v1_5_conversion) {
-			mult = 25000;
-		}
+	if (g_eeprom_data.conversion_mode == CONVERSION_MODE_OLD_1v5) {
+		mult = 25000;
 	}
 
 	if (g_eeprom_data.deadzone_enabled) {
 		dz = 12;
 		mult = 30000; // V1.6
-		if (g_eeprom_data.old_v1_5_conversion) {
+		if (g_eeprom_data.conversion_mode == CONVERSION_MODE_OLD_1v5) {
 			mult = 29000;
 		}
 	}
@@ -101,9 +99,10 @@ int calb(char orig, unsigned char val)
 		}
 	}
 
-	if (!g_eeprom_data.wide_conversion) {
-	//tmp = tmp * 31000L / 32000L;
-	tmp = tmp * mult / 32000L;
+	/* Apply translation, unless we are in 'extended' mode where gamecube
+	 * values are just sent directly without transformation. */
+	if (g_eeprom_data.conversion_mode != CONVERSION_MODE_EXTENDED) {
+		tmp = tmp * mult / 32000L;
 	}
 
 	if (tmp<=-127)
@@ -111,21 +110,8 @@ int calb(char orig, unsigned char val)
 
 	if (tmp>127)
 		tmp = 127;
-/*
-	if (tmp<0) {
-		tmp = -((char)(pgm_read_byte(&correction_lut[tmp*-2])/2));
-	} else {
-		tmp = (char)(pgm_read_byte(&correction_lut[tmp*2])/2);
-	}
-*/
-	//
-	//   Real N64 x axis
-	// -68 0 63
-	// -79 0 78
-	// -68 0 66
-	//
 
-	return tmp; // ((unsigned char)tmp ^ 0x80);
+	return tmp;
 }
 
 void gamecubeXYtoN64(unsigned char x, unsigned char y, char *dst_x, char *dst_y)
@@ -140,7 +126,7 @@ void gamecubeXYtoN64(unsigned char x, unsigned char y, char *dst_x, char *dst_y)
 	//long l = 16000;
 	long l = 256; // Version 1.6
 
-	if (g_eeprom_data.wide_conversion) {
+	if (g_eeprom_data.conversion_mode == CONVERSION_MODE_EXTENDED) {
 		sig_x = calb(gc_x_origin, x);
 		sig_y = calb(gc_y_origin, y);
 
@@ -149,7 +135,7 @@ void gamecubeXYtoN64(unsigned char x, unsigned char y, char *dst_x, char *dst_y)
 		return;
 	}
 
-	if (g_eeprom_data.old_v1_5_conversion) {
+	if (g_eeprom_data.conversion_mode == CONVERSION_MODE_OLD_1v5) {
 		// Provide a way to use the old parameters, in case
 		// it turns out the new values are not good.
 		l = 512;
