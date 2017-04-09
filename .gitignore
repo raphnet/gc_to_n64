@@ -2,4 +2,5 @@
 *.swp
 *.hex
 *.elf
+*.bin
 *.map

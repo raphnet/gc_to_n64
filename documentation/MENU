@@ -25,6 +25,6 @@ Hold start for ~8 seconds : Enters mapping mode
 
 5) L followed by START -> Make the built-in (standard) mapping active by default
 
-6) B -> Toggle v1.5 stick conversion, save and exit
+6) B -> Cycle stick conversion mode (v1.5 style, v2.0 standard style [default], and extended style). Save and exit.
 
 7) X -> Restore factory defaults

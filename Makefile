@@ -2,7 +2,7 @@ CC=avr-gcc
 AS=$(CC)
 LD=$(CC)
 
-VERSION=2.1
+VERSION=2.1-test2
 CPU=atmega168
 CFLAGS=-Wall -mmcu=$(CPU) -DF_CPU=16000000L -Os -DVISUAL_BUZZER -DVERSION_STR=\"$(VERSION)\"
 LDFLAGS=-mmcu=$(CPU) -Wl,-Map=gc_to_n64.map -Wl,--section-start=.endmarker=0x37fc
@@ -10,7 +10,7 @@ HEXFILE=gc_to_n64b.hex
 AVRDUDE=avrdude
 AVRDUDE_CPU=m168
 
-OBJS=main.o gamecube.o n64_isr.o mapper.o gamecube_mapping.o n64_mapping.o buzzer.o timer0.o eeprom.o sync.o lut.o gcn64_protocol.o
+OBJS=main.o gamecube.o n64_isr.o mapper.o gamecube_mapping.o n64_mapping.o buzzer.o timer0.o eeprom.o sync.o lut.o gcn64_protocol.o menu.o
 
 all: $(HEXFILE)
 

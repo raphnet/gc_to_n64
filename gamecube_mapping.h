@@ -2,8 +2,11 @@
 #define _gamecube_mapping_h__
 
 #include "mapper.h"
+#include "gamecube.h"
 
 extern struct mapping_controller_unit g_gamecube_status[];
+void gc_report_to_mapping(const unsigned char gcr[GC_REPORT_SIZE], struct mapping_controller_unit *gcs);
+void setOriginsFromReport(const unsigned char gcr[GC_REPORT_SIZE]);
 
 #define MAP_GC_BTN_A			0
 #define MAP_GC_BTN_B			1

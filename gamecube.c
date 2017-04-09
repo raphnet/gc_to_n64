@@ -1,5 +1,5 @@
 /*  GC to N64 : Gamecube controller to N64 adapter firmware
-    Copyright (C) 2011-2015  Raphael Assenat <raph@raphnet.net>
+    Copyright (C) 2011-2017  Raphael Assenat <raph@raphnet.net>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -44,7 +44,7 @@ static void gamecubeInit(void)
 
 	DDRB |= 0x02; // Bit 1 out
 	PORTB &= ~0x02; // 0
-	
+
 	// data as input
 	GC_DATA_DDR &= ~(GC_DATA_BIT);
 
@@ -59,12 +59,12 @@ static void gamecubeInit(void)
 
 void gc_decodeAnswer()
 {
-	unsigned char tmpdata[8];	
+	unsigned char tmpdata[8];
 	int i;
 
 	// Note: Checking seems a good idea, adds protection
-	// against corruption (if the "constant" bits are invalid, 
-	// maybe others are : Drop the packet). 
+	// against corruption (if the "constant" bits are invalid,
+	// maybe others are : Drop the packet).
 	//
 	// However, I have seen bit 2 in a high state. To be as compatible
 	// as possible, I decided NOT to look at these bits since instead
@@ -78,7 +78,7 @@ void gc_decodeAnswer()
 	if (!gcn64_workbuf[8])
 		return 1;
 #endif
-	
+
 /*
 	(Source: Nintendo Gamecube Controller Protocol
 		updated 8th March 2004, by James.)
@@ -102,15 +102,15 @@ void gc_decodeAnswer()
 	48-55	Left Btn Val
 	56-63	Right Btn Val
  */
-	
+
 	/* Convert the one-byte-per-bit data generated
 	 * by the assembler mess above to nicely packed
-	 * binary data. */	
+	 * binary data. */
 	memset(tmpdata, 0, sizeof(tmpdata));
 
 	for (i=0; i<8; i++) // X axis
 		tmpdata[0] |= gcn64_workbuf[i+16] ? (0x80>>i) : 0;
-	
+
 	for (i=0; i<8; i++) // Y axis
 		tmpdata[1] |= gcn64_workbuf[i+24] ? (0x80>>i) : 0;
 	tmpdata[1] ^= 0xff;
@@ -119,21 +119,21 @@ void gc_decodeAnswer()
 		tmpdata[2] |= gcn64_workbuf[i+32] ? (0x80>>i) : 0;
 
 	for (i=0; i<8; i++) // C Y axis
-		tmpdata[3] |= gcn64_workbuf[i+40] ? 0 : (0x80>>i);	
+		tmpdata[3] |= gcn64_workbuf[i+40] ? 0 : (0x80>>i);
 
 	for (i=0; i<8; i++) // Left btn value
 		tmpdata[4] |= gcn64_workbuf[i+48] ? (0x80>>i) : 0;
 	tmpdata[4] ^= 0xff;
-	
+
 	for (i=0; i<8; i++) // Right btn value
-		tmpdata[5] |= gcn64_workbuf[i+56] ? (0x80>>i) : 0;	
+		tmpdata[5] |= gcn64_workbuf[i+56] ? (0x80>>i) : 0;
 	tmpdata[5] ^= 0xff;
 
 	for (i=0; i<5; i++) // St Y X B A
 		tmpdata[6] |= gcn64_workbuf[i+3] ? (0x01<<i) : 0;
 	for (i=0; i<3; i++) // L R Z
 		tmpdata[6] |= gcn64_workbuf[i+9] ? (0x20<<i) : 0;
-	
+
 	for (i=0; i<4; i++) // Up,Down,Right,Left
 		tmpdata[7] |= gcn64_workbuf[i+12] ? (0x01<<i) : 0;
 
@@ -141,19 +141,17 @@ void gc_decodeAnswer()
 	for (i=0; i<6; i++) {
 		last_built_report[i] = tmpdata[i];
 	}
-	
+
 	// buttons
 	last_built_report[6] = tmpdata[6];
 	last_built_report[7] = tmpdata[7];
 }
-
 
 static char gamecubeUpdate(char origin)
 {
 	unsigned char tmp=0;
 	unsigned char tmpdata[8];
 	unsigned char count;
-
 
 	/* The GetID command. This is required for the Nintendo Wavebird to work... */
 	tmp = GC_GETID;
@@ -162,8 +160,8 @@ static char gamecubeUpdate(char origin)
 		return 1;
 	}
 
-	/* 
-	 * The wavebird needs time. It does not answer the 
+	/*
+	 * The wavebird needs time. It does not answer the
 	 * folowwing get status command if we don't wait here.
 	 *
 	 * A good 2:1 safety margin has been chosen.
@@ -175,28 +173,28 @@ static char gamecubeUpdate(char origin)
 	// 30 : works
 	_delay_us(50);
 
-	// 2013-05-19 RA: 
+	// 2013-05-19 RA:
 	//
-	// I discovered that in the goldeneye menu, the crosshair moves down 
+	// I discovered that in the goldeneye menu, the crosshair moves down
 	// very slowly when the controller is idle. This means that making
 	// the zero with the 0x420302 does not work properly. Revert
 	// to using the first value returned by GETSTATUS.
-	origin = 0; 
+	origin = 0;
 
 	if (origin)	{
 		// Ok... at first I was trying a so-called 'get origin command' (0x41) to work,
 		// but it did nothing on the wavebird. But this command seems to work. The document
-		// Yet another gamecube documentation says 'calibrate ?'. 
+		// Yet another gamecube documentation says 'calibrate ?'.
 		//
 		// Wavebird: Fixed data
 		// Normal controller: Varies
 		//
-		// The answer is 80 bits with the first 64 bits have the same as with 
+		// The answer is 80 bits with the first 64 bits have the same as with
 		// the GET_STATUS command.
 		tmpdata[0] = 0x42;
 		tmpdata[1] = 0x03;
 		tmpdata[2] = 0x02;
-		
+
 		count = gcn64_transaction(tmpdata, 3);
 		if (count != 80) {
 			return 1;
@@ -205,7 +203,7 @@ static char gamecubeUpdate(char origin)
 		tmpdata[0] = GC_GETSTATUS1;
 		tmpdata[1] = GC_GETSTATUS2;
 		tmpdata[2] = GC_GETSTATUS3(0);
-		
+
 		count = gcn64_transaction(tmpdata, 3);
 		if (count != GC_GETSTATUS_REPLY_LENGTH) {
 			return 1;
@@ -216,7 +214,6 @@ static char gamecubeUpdate(char origin)
 
 	return 0;
 }
-
 
 static char gamecubeProbe(void)
 {
@@ -231,7 +228,7 @@ static char gamecubeChanged(void)
 {
 	static int first = 1;
 	if (first) { first = 0;  return 1; }
-	
+
 	return memcmp(last_built_report, last_sent_report, GC_REPORT_SIZE);
 }
 
@@ -239,8 +236,8 @@ static void gamecubeBuildReport(unsigned char *reportBuffer)
 {
 	if (reportBuffer != NULL)
 		memcpy(reportBuffer, last_built_report, GC_REPORT_SIZE);
-	
-	memcpy(last_sent_report, last_built_report, GC_REPORT_SIZE);	
+
+	memcpy(last_sent_report, last_built_report, GC_REPORT_SIZE);
 }
 
 Gamepad GamecubeGamepad = {
@@ -256,4 +253,3 @@ Gamepad *gamecubeGetGamepad(void)
 {
 	return &GamecubeGamepad;
 }
-

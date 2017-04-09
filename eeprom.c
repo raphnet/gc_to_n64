@@ -1,5 +1,5 @@
 /*  GC to N64 : Gamecube controller to N64 adapter firmware
-    Copyright (C) 2011-2015  Raphael Assenat <raph@raphnet.net>
+    Copyright (C) 2011-2017  Raphael Assenat <raph@raphnet.net>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -25,7 +25,7 @@ void eeprom_commit(void)
 	eeprom_write_block(&g_eeprom_data, (void*)0x00, sizeof(struct eeprom_data_struct));
 }
 
-static char magic[EEPROM_MAGIC_SIZE] = { 'G','C','2','N','6','4','v','7' };
+static char magic[EEPROM_MAGIC_SIZE] = { 'G','C','2','N','6','4','v','8' };
 
 void eeprom_writeDefaults(void)
 {
@@ -34,6 +34,7 @@ void eeprom_writeDefaults(void)
 	g_eeprom_data.defmap = 0;
 	g_eeprom_data.deadzone_enabled = 0;
 	g_eeprom_data.old_v1_5_conversion = 0;
+	g_eeprom_data.conversion_mode = CONVERSION_MODE_V2;
 
 	// This fill lets default mappings be empty (-1,-1 being the terminator)
 	memset(g_eeprom_data.appdata, 0xff, EEPROM_APPDATA_SIZE);
@@ -54,3 +55,29 @@ int eeprom_init(void)
 	return 0;
 }
 
+void cycle_conversion_mode(void)
+{
+	g_eeprom_data.conversion_mode++;
+	if (g_eeprom_data.conversion_mode > CONVERSION_MAX) {
+		g_eeprom_data.conversion_mode = CONVERSION_MODE_OLD_1v5;
+	}
+
+	// Emulate the old v1.5 field
+	if (g_eeprom_data.conversion_mode == CONVERSION_MODE_OLD_1v5) {
+		g_eeprom_data.old_v1_5_conversion = 1;
+	} else {
+		g_eeprom_data.old_v1_5_conversion = 0;
+	}
+}
+
+void toggleDeadzone(void)
+{
+	g_eeprom_data.deadzone_enabled = !g_eeprom_data.deadzone_enabled;
+	eeprom_commit();
+}
+
+void setDefaultMapping(int id)
+{
+	g_eeprom_data.defmap = id;
+	eeprom_commit();
+}

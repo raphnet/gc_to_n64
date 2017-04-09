@@ -10,7 +10,7 @@ typedef struct {
 
 	int deviceDescriptorSize; // if 0, use default
 	void *deviceDescriptor; // must be in flash
-	
+
 	void (*init)(void);
 	char (*update)(char origin);
 	char (*changed)(void);
@@ -21,6 +21,3 @@ typedef struct {
 } Gamepad;
 
 #endif // _gamepad_h__
-
-
-

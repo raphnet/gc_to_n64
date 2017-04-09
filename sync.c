@@ -1,5 +1,5 @@
 /*  GC to N64 : Gamecube controller to N64 adapter firmware
-    Copyright (C) 2011-2015  Raphael Assenat <raph@raphnet.net>
+    Copyright (C) 2011-2017  Raphael Assenat <raph@raphnet.net>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -24,7 +24,7 @@
 /* Forces the old behaviour which means a stable time distance
  * between N64 poll and our Gamecube * poll. Sometimes useful
  * when debugging with an oscilloscope. */
-//#define OLD_MODE
+#undef OLD_MODE
 
 /*
  * - Introduction
@@ -124,7 +124,13 @@ void sync_master_polled_us(void)
 			if (elapsed > TIME_TO_POLL + MIN_IDLE + MARGIN) {
 				// Program the next GC poll at the last moment before the
 				// expected N64 poll.
-				poll_threshold = elapsed - TIME_TO_POLL - MARGIN;
+
+				// Before 2.1, it was done like this:
+				//poll_threshold = elapsed - TIME_TO_POLL - MARGIN;
+
+				// Since 2.1, the threshold is a fraction of the elapsed
+				// time.
+				poll_threshold = elapsed * 6L / 7L;
 			} else {
 				poll_threshold = DEFAULT_THRESHOLD;
 			}
