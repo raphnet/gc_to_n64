@@ -1,3 +1,19 @@
+/*  GC to N64 : Gamecube controller to N64 adapter firmware
+    Copyright (C) 2011-2017  Raphael Assenat <raph@raphnet.net>
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
 #include <util/delay.h>
 #include <avr/interrupt.h>
 #include <avr/io.h>
@@ -51,38 +67,38 @@ static int getEvent(void)
 		g_gcpad->update(GAMECUBE_UPDATE_NORMAL);
 		if (g_gcpad->changed()) {
 			int now = 0;
-			// Read the gamepad	
-			g_gcpad->buildReport(gc_report);				
-				
+			// Read the gamepad
+			g_gcpad->buildReport(gc_report);
+
 			// Convert the data we got from the gamepad reader
 			// to a mapping structure.
 			gc_report_to_mapping(gc_report, g_gamecube_status);
 
 			if (g_gamecube_status[MAP_GC_BTN_A].value)
-				now |= EV_BTN_A;	
+				now |= EV_BTN_A;
 			if (g_gamecube_status[MAP_GC_BTN_B].value)
-				now |= EV_BTN_B;	
+				now |= EV_BTN_B;
 			if (g_gamecube_status[MAP_GC_BTN_X].value)
-				now |= EV_BTN_X;	
+				now |= EV_BTN_X;
 			if (g_gamecube_status[MAP_GC_BTN_Y].value)
-				now |= EV_BTN_Y;	
+				now |= EV_BTN_Y;
 			if (g_gamecube_status[MAP_GC_BTN_Z].value)
-				now |= EV_BTN_Z;	
+				now |= EV_BTN_Z;
 			if (g_gamecube_status[MAP_GC_BTN_L].value)
-				now |= EV_BTN_L;	
+				now |= EV_BTN_L;
 			if (g_gamecube_status[MAP_GC_BTN_R].value)
-				now |= EV_BTN_R;	
+				now |= EV_BTN_R;
 			if (g_gamecube_status[MAP_GC_BTN_DPAD_UP].value)
-				now |= EV_BTN_D_UP;	
+				now |= EV_BTN_D_UP;
 			if (g_gamecube_status[MAP_GC_BTN_DPAD_DOWN].value)
-				now |= EV_BTN_D_DOWN;	
+				now |= EV_BTN_D_DOWN;
 			if (g_gamecube_status[MAP_GC_BTN_DPAD_LEFT].value)
 				now |= EV_BTN_D_LEFT;
 			if (g_gamecube_status[MAP_GC_BTN_DPAD_RIGHT].value)
 				now |= EV_BTN_D_RIGHT;
 			if (g_gamecube_status[MAP_GC_BTN_START].value)
 				now |= EV_BTN_START;
-	
+
 			for (b=1; b<=EV_BTN_START; b<<=1) {
 				if ((now & b) != (status & b)) {
 					if (now & b) {
@@ -152,7 +168,7 @@ first_ev:
 				value *= CODE_BASE;
 				value += 2;
 				break;
-			case EV_BTN_Y:			
+			case EV_BTN_Y:
 				value *= CODE_BASE;
 				value += 3;
 				break;
@@ -385,5 +401,3 @@ menu_done:
 
 	SREG = sreg;
 }
-
-

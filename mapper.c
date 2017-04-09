@@ -1,5 +1,5 @@
 /*  GC to N64 : Gamecube controller to N64 adapter firmware
-    Copyright (C) 2011-2015  Raphael Assenat <raph@raphnet.net>
+    Copyright (C) 2011-2017  Raphael Assenat <raph@raphnet.net>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -83,14 +83,14 @@ void mapper_copy(struct mapping_entry *map, struct mapping_controller_unit *inpu
 {
 	int idx_in, idx_out;
 
-	// Prepare output from default state	
+	// Prepare output from default state
 	allDefault(output);
 
 	while (map->input != -1)
 	{
 		idx_in = map->input;
 		idx_out = map->output;
-	
+
 		switch(output[idx_out].type)
 		{
 			default:
@@ -107,7 +107,7 @@ void mapper_copy(struct mapping_entry *map, struct mapping_controller_unit *inpu
 					output[idx_out].value = input[idx_in].value;
 				}
 				break;
-				
+
 			case TYPE_AXIS_TO_BTN:
 				if (mapper_getButton(&input[idx_in])) {
 					output[idx_out].value = output[idx_out].thres;
@@ -118,6 +118,4 @@ void mapper_copy(struct mapping_entry *map, struct mapping_controller_unit *inpu
 		map++;
 	}
 }
-
-
 

@@ -1,5 +1,5 @@
 /*  GC to N64 : Gamecube controller to N64 adapter firmware
-    Copyright (C) 2011-2015  Raphael Assenat <raph@raphnet.net>
+    Copyright (C) 2011-2017  Raphael Assenat <raph@raphnet.net>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -428,7 +428,7 @@ wait_for_controller:
 	if (g_gamecube_status[MAP_GC_BTN_START].value) {
 		menumain(g_gamecube_status);
 	}
-	
+
 	DEBUG_LOW();
 
 	sync_init();
@@ -445,9 +445,9 @@ wait_for_controller:
 			g_todo_save_mapping = 0;
 		}
 
-		if (sync_may_poll()) {	
+		if (sync_may_poll()) {
 			DEBUG_HIGH();
-			timerIntOff();		
+			timerIntOff();
 			res = g_gcpad->update(GAMECUBE_UPDATE_NORMAL);
 			timerIntOn();
 			DEBUG_LOW();
@@ -464,16 +464,16 @@ wait_for_controller:
 
 			if (g_gcpad->changed()) {
 				DEBUG_HIGH();
-				// Read the gamepad	
-				g_gcpad->buildReport(gc_report);				
-				
+				// Read the gamepad
+				g_gcpad->buildReport(gc_report);
+
 				// Convert the data we got from the gamepad reader
 				// to a mapping structure.
 				gc_report_to_mapping(gc_report, g_gamecube_status);
 
 				// Maybe enter configuration menu mode. If we did,
 				// 1 is returned.
-							
+
 				// Perform mapping (conversion), copying data at appropriate
 				// places in the output structure (n64 status)
 				mapper_copy(current_mapping, g_gamecube_status, g_n64_status);
@@ -487,11 +487,9 @@ wait_for_controller:
 			}
 
 			domenu(g_gamecube_status);
-	
+
 		}
-
 	}
-
 }
 
 void enter_bootloader(void)

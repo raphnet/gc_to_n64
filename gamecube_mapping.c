@@ -1,5 +1,5 @@
 /*  GC to N64 : Gamecube controller to N64 adapter firmware
-    Copyright (C) 2011-2015  Raphael Assenat <raph@raphnet.net>
+    Copyright (C) 2011-2017  Raphael Assenat <raph@raphnet.net>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -111,14 +111,14 @@ int calb(char orig, unsigned char val)
 
 	if (tmp>127)
 		tmp = 127;
-/*	
+/*
 	if (tmp<0) {
 		tmp = -((char)(pgm_read_byte(&correction_lut[tmp*-2])/2));
 	} else {
 		tmp = (char)(pgm_read_byte(&correction_lut[tmp*2])/2);
 	}
 */
-	//   
+	//
 	//   Real N64 x axis
 	// -68 0 63
 	// -79 0 78
@@ -220,7 +220,7 @@ void gc_report_to_mapping(const unsigned char gcr[GC_REPORT_SIZE], struct mappin
 	gamecubeXYtoN64(gcr[0], gcr[1], &gcs[MAP_GC_AXIS_LEFT_RIGHT].value, &gcs[MAP_GC_AXIS_UP_DOWN].value);
 //	gcs[MAP_GC_AXIS_LEFT_RIGHT].value = gamecubeXtoN64(gcr[0]);
 //	gcs[MAP_GC_AXIS_UP_DOWN].value = gamecubeYtoN64(gcr[1]);
-	
+
 	gcs[MAP_GC_BTN_X].value = gcr[6] & 0x04;
 	gcs[MAP_GC_BTN_Y].value = gcr[6] & 0x02;
 
@@ -235,5 +235,3 @@ void gc_report_to_mapping(const unsigned char gcr[GC_REPORT_SIZE], struct mappin
 	gcs[MAP_GC_AXIS_C_LEFT_RIGHT].value = gcs[MAP_GC_AXB_C_LEFT].value;
 	gcs[MAP_GC_AXIS_C_UP_DOWN].value = gcs[MAP_GC_AXB_C_UP].value;
 }
-
-

@@ -1,7 +1,7 @@
 ;
 ;	n64_to_wii: AVR Microcontroller firmware for converting N64 controller
 ;	          protocol to Nintendo Wii/Gamecube controller protocol.
-;    Copyright (C) 2007-2015  Raphael Assenat <raph@raphnet.net>
+;    Copyright (C) 2007-2017  Raphael Assenat <raph@raphnet.net>
 ;
 ;    This program is free software; you can redistribute it and/or modify
 ;    it under the terms of the GNU General Public License as published by

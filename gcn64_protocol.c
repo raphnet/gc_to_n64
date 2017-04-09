@@ -1,5 +1,5 @@
 /*	gc_n64_usb : Gamecube or N64 controller to USB firmware
-	Copyright (C) 2007-2015  Raphael Assenat <raph@raphnet.net>
+	Copyright (C) 2007-2017  Raphael Assenat <raph@raphnet.net>
 
 	This program is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -49,13 +49,13 @@ static int bitsToWorkbufBytes(unsigned char *bytes, int num_bytes, int workbuf_b
 			gcn64_workbuf[bit+workbuf_bit_offset] = bytes[i] & p;
 			bit++;
 		}
-	}	
+	}
 
 	return bit;
 }
 
-// The bit timeout is a counter to 127. This is the 
-// start value. Counting from 0 takes hundreads of 
+// The bit timeout is a counter to 127. This is the
+// start value. Counting from 0 takes hundreads of
 // microseconds. Because of this, the reception function
 // "hangs in there" much longer than necessary..
 #ifdef FREQ_IS_16MHZ
@@ -73,14 +73,14 @@ static unsigned char gcn64_receive()
 //#define SET_DBG	"	sbi %3, 4		\n"
 //#define CLR_DBG	"	cbi %3, 4		\n"
 
-	// The data line has been released. 
+	// The data line has been released.
 	// The receive part below expects it to be still high
 	// and will wait for it to become low before beginning
 	// the counting.
 	asm volatile(
 		"	push r30				\n"	// save Z
 		"	push r31				\n"	// save Z
-		
+
 		"	clr %0					\n"
 		"	clr r16					\n"
 "initial_wait_low:\n"
@@ -89,7 +89,7 @@ static unsigned char gcn64_receive()
 		"	sbic %2, "GCN64_BIT_NUM_S"		\n"
 		"	rjmp initial_wait_low	\n"
 
-		// the next transition is to a high bit	
+		// the next transition is to a high bit
 		"	rjmp waithigh			\n"
 
 "waitlow:\n"
@@ -99,7 +99,7 @@ static unsigned char gcn64_receive()
 		"	brmi timeout			\n" // > 127 (approx 50uS timeout)
 		"	sbic %2, "GCN64_BIT_NUM_S"			\n"
 		"	rjmp waitlow_lp			\n"
-	
+
 		"	inc %0					\n" // count this timed low level
 		"	breq overflow			\n" // > 255
 		"	st z+,r16				\n"
@@ -111,7 +111,7 @@ static unsigned char gcn64_receive()
 		"	brmi timeout			\n" // > 127
 		"	sbis %2, "GCN64_BIT_NUM_S"		\n"
 		"	rjmp waithigh_lp		\n"
-	
+
 		"	inc %0					\n" // count this timed high level
 		"	breq overflow			\n" // > 255
 		"	st z+,r16				\n"
@@ -155,7 +155,7 @@ static void gcn64_sendBytes(unsigned char *data, unsigned char n_bytes)
 	// valid for 16Mhz clock. (Tuned to 1us/3us using a scope)
 #define DLY_SHORT_1ST	"ldi r17, 2\n nop\nrcall sb_dly%=\n "
 #define DLY_LARGE_1ST	"ldi r17, 13\n rcall sb_dly%=\n"
-#define DLY_SHORT_2ND	"nop\nnop\nnop\nnop\n" 
+#define DLY_SHORT_2ND	"nop\nnop\nnop\nnop\n"
 #define DLY_LARGE_2ND	"ldi r17, 9\n rcall sb_dly%=\nnop\nnop\n"
 
 #else
@@ -163,7 +163,7 @@ static void gcn64_sendBytes(unsigned char *data, unsigned char n_bytes)
 	// valid for 12Mhz clock.
 #define DLY_SHORT_1ST	"ldi r17, 1\n rcall sb_dly%=\n "
 #define DLY_LARGE_1ST	"ldi r17, 9\n rcall sb_dly%=\n"
-#define DLY_SHORT_2ND	"\n" 
+#define DLY_SHORT_2ND	"\n"
 #define DLY_LARGE_2ND	"ldi r17, 5\n rcall sb_dly%=\n nop\nnop\n"
 #endif
 
@@ -181,7 +181,6 @@ static void gcn64_sendBytes(unsigned char *data, unsigned char n_bytes)
 	"	brne sb_send1%=		\n"
 
 	"	rjmp sb_end%=		\n" // not reached
-
 
 	"sb_send0%=:			\n"
 	"	nop					\n"
@@ -207,7 +206,6 @@ static void gcn64_sendBytes(unsigned char *data, unsigned char n_bytes)
 	"	dec r17				\n"
 	"	brne sb_dly%=		\n"
 	"	ret					\n"
-	
 
 	"sb_end%=:\n"
 	// going here is fast so we need to extend the last
@@ -224,7 +222,7 @@ static void gcn64_sendBytes(unsigned char *data, unsigned char n_bytes)
 	DLY_SHORT_1ST
 	RELEASE_DATA
 
-	// Now, we need to loop until the wire is high to 
+	// Now, we need to loop until the wire is high to
 	// prevent the reception code from thinking this is
 	// the beginning of the first reply bit.
 
@@ -255,40 +253,39 @@ static void gcn64_decodeWorkbuf(unsigned char count)
 	volatile unsigned char *input = gcn64_workbuf;
 	unsigned char t;
 
-    //  
+    //
     //          ________
     // ________/
-    //  
+    //
     //   [i*2]    [i*2+1]
-    //  
+    //
     //          ________________
     // 0 : ____/
     //                      ____
     // 1 : ________________/
-    //  
+    //
     // The timings on a real N64 are
-    //  
+    //
     // 0 : 1 us low, 3 us high
     // 1 : 3 us low, 1 us high
-    //  
+    //
     // However, HORI pads use something similar to
-    //  
+    //
     // 0 : 1.5 us low, 4.5 us high
     // 1 : 4.5 us low, 1.5 us high
-    //  
-    //  
+    //
+    //
     // No64 us = microseconds
 
 	// This operation takes approximately 100uS on 64bit gamecube messages
 	for (i=0; i<count; i++) {
-		t = *input; 
+		t = *input;
 		input++;
 
 		*output = t < *input;
 		input++;
 
 		output++;
-		
 	}
 }
 
@@ -300,13 +297,11 @@ void gcn64protocol_hwinit(void)
 	// keep data low. By toggling the direction, we make the
 	// pin act as an open-drain output.
 	GCN64_DATA_PORT &= ~GCN64_DATA_BIT;
-	
+
 	/* debug bit PORTB4 (MISO) */
 	DDRB |= 0x10;
 	PORTB &= ~0x10;
 }
-
-
 
 /**
  * \brief Send n data bytes + stop bit, wait for answer.
@@ -326,7 +321,7 @@ int gcn64_transaction(unsigned char *data_out, int data_out_len)
 
 	if (!(count & 0x01)) {
 		// If we don't get an odd number of level lengths from gcn64_receive
-		// something is wrong. 
+		// something is wrong.
 		//
 		// The stop bit is a short (~1us) low state followed by an "infinite"
 		// high state, which timeouts and lets the function return. This
@@ -335,16 +330,15 @@ int gcn64_transaction(unsigned char *data_out, int data_out_len)
 	}
 
 	gcn64_decodeWorkbuf(count);
-	
+
 	/* this delay is required on N64 controllers. Otherwise, after sending
 	 * a rumble-on or rumble-off command (probably init too), the following
 	 * get status fails. This starts to work at 2us. 5 should be safe. */
 	_delay_us(5);
-	
+
 	/* return the number of full bits received. */
 	return (count-1) / 2;
 }
-
 
 #if (GC_GETID != 	N64_GET_CAPABILITIES)
 #error N64 vs GC detection commnad broken
@@ -363,7 +357,7 @@ int gcn64_detectController(void)
 		return CONTROLLER_IS_UNKNOWN;
 	}
 
-	/* 
+	/*
 	 * -- Standard gamecube controller answer:
 	 * 0000 1001 0000 0000 0010 0011  : 0x090023  or
 	 * 0000 1001 0000 0000 0010 0000  : 0x090020
@@ -376,13 +370,13 @@ int gcn64_detectController(void)
 	 *
 	 * 1110 1001 1010 0000 0001 0111 : 0xE9A017
 	 * (controller on)
-	 * 
+	 *
 	 * 1010 1000 0000
 	 *
 	 * -- Intec wireless gamecube controller
 	 * 0000 1001 0000 0000 0010 0000 : 0x090020
 	 *
-	 * 
+	 *
 	 * -- Standard N64 controller
 	 * 0000 0101 0000 0000 0000 0000 : 0x050000 (no pack)
 	 * 0000 0101 0000 0000 0000 0001 : 0x050001 With expansion pack
@@ -394,8 +388,8 @@ int gcn64_detectController(void)
 	 * gamecube compatible controller is present. If on the other hand
 	 * we have a 5, then we are communicating with a N64 controller.
 	 *
-	 * This conclusion appears to be corroborated by my old printout of 
-	 * the document named "Yet another gamecube documentation (but one 
+	 * This conclusion appears to be corroborated by my old printout of
+	 * the document named "Yet another gamecube documentation (but one
 	 * that's worth printing). The document explains that and ID can
 	 * be read by sending what they call the 'SI command 0x00 to
 	 * which the controller replies with 3 bytes. (Clearly, that's
@@ -429,7 +423,7 @@ int gcn64_detectController(void)
 	switch(nib)
 	{
 		case 0x5: return CONTROLLER_IS_N64;
-		
+
 		case 0x9: // normal controllers
 		case 0x8: // wavebird, controller off.
 		case 0xb: // Never saw this one, but it is mentionned above.
@@ -440,5 +434,3 @@ int gcn64_detectController(void)
 
 	return 0;
 }
-
-

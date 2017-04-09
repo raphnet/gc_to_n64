@@ -1,5 +1,5 @@
 /*  GC to N64 : Gamecube controller to N64 adapter firmware
-    Copyright (C) 2011-2015  Raphael Assenat <raph@raphnet.net>
+    Copyright (C) 2011-2017  Raphael Assenat <raph@raphnet.net>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -40,5 +40,3 @@ struct mapping_controller_unit g_n64_status[] = {
 	[MAP_N64_AXB_JOY_RIGHT]	= { .type = TYPE_AXIS_TO_BTN, .thres = THRES_FULL_POS }, // Joystick right
 	[MAP_N64_NONE] = { .type = TYPE_NONE },
 };
-
-
