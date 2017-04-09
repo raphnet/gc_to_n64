@@ -9,6 +9,7 @@ extern unsigned char gc_report[GC_REPORT_SIZE];
 extern Gamepad *g_gcpad;
 extern struct mapping_entry current_mapping[MAP_GC_NONE + 2];
 
+int loadMappingId(int id);
 void saveCurrentMappingTo(int id);
 int calb(char orig, unsigned char val);
 
