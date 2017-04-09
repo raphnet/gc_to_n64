@@ -1,4 +1,6 @@
-Next : Version 2.1
+April 9, 2017 : Version 2.1
+    - Add a new conversion mode for Joystick values: Extended (where Gamecube
+  	  values are forwarded to the N64 without transformations)
     - Set lock bits to protect bootloader from erasure
 
 October 10, 2015 : Version 2.0
